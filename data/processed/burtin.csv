@@ -1,0 +1,17 @@
+penicillin,streptomycin,neomycin,gram_staining,genus
+870.0,1.0,1.6,negative,other
+0.001,0.01,0.007,positive,other
+1.0,2.0,0.02,negative,other
+0.005,11.0,10.0,positive,other
+100.0,0.4,0.1,negative,other
+850.0,1.2,1.0,negative,other
+800.0,5.0,2.0,negative,other
+3.0,0.1,0.1,negative,other
+850.0,2.0,0.4,negative,other
+1.0,0.4,0.008,negative,Salmonella
+10.0,0.8,0.09,negative,Salmonella
+0.007,0.1,0.001,positive,Staphylococcus
+0.03,0.03,0.001,positive,Staphylococcus
+1.0,1.0,0.1,positive,Streptococcus
+0.001,14.0,10.0,positive,Streptococcus
+0.005,10.0,40.0,positive,Streptococcus
