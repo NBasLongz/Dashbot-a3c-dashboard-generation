@@ -1,0 +1,28 @@
+dataset,rows,columns,method,model_loaded,search_steps,key_column,reward,charts,chart_types,chart_type_names,insights,runtime_sec
+anscombe.csv,44,3,a3c,True,1000,x,2.3136687690619144,5,3,"bar, boxplot, point",6,115.43905470000027
+barley.csv,120,4,a3c,True,1000,site,2.13878852333319,4,3,"bar, boxplot, line",5,90.33131700000013
+birdstrikes.csv,9938,10,a3c,True,1000,cost_repair,3.268588662000706,5,1,bar,10,292.4950381999988
+burtin.csv,16,5,a3c,True,1000,streptomycin,3.292569550762795,5,1,bar,10,144.05432239999936
+cars.csv,406,9,a3c,True,1000,weight_in_lbs,8.046670334387795,5,1,bar,26,485.4038703000042
+co2-concentration.csv,741,3,a3c,True,1000,co2,1.7136687690619143,5,3,"bar, line, point",4,15.132925400001113
+crimea.csv,24,5,a3c,True,1000,other,1.6748175603183477,5,2,"line, point",4,119.13978009999846
+disasters.csv,803,3,a3c,True,1000,entity,1.6136687690619143,3,3,"bar, boxplot, line",3,58.81990460000088
+driving.csv,55,4,a3c,True,1000,side,2.3136687690619144,5,3,"bar, line, point",6,48.93301159999828
+flights-2k.csv,2000,5,a3c,True,1000,date,3.0748175603183476,5,2,"bar, line",9,78.58325320000586
+gapminder.csv,682,6,a3c,True,1000,pop,3.0748175603183476,5,2,"bar, line",9,149.52075650000188
+gapminder-health-income.csv,187,4,a3c,True,1000,region,2.5748175603183476,5,2,"bar, point",7,95.43077780000021
+github.csv,955,2,a3c,True,1000,count,1.0748175603183476,3,2,"bar, line",1,13.070920800004387
+global-temp.csv,144,2,a3c,True,1000,year,0.8139748377145497,1,1,line,1,13.617711400002008
+iowa-electricity.csv,51,3,a3c,True,1000,year,1.503282552381184,2,2,"bar, line",3,46.01456219999818
+jobs.csv,7650,5,a3c,True,1000,perc,3.0613103682942366,5,2,"bar, point",9,76.55376950000209
+la-riots.csv,63,10,a3c,True,1000,death_date,3.279062358738684,5,1,bar,10,97.98397190000105
+movies.csv,3201,10,a3c,True,1000,rotten_tomatoes_rating,4.479062358738684,5,1,bar,14,484.9780305000022
+obesity.csv,50,2,a3c,True,1000,rate,0.899937314589623,4,2,"bar, point",0,23.800466400003643
+ohlc.csv,44,7,a3c,True,1000,low,4.483778608617237,5,1,bar,14,291.16056899999967
+penguins.csv,344,7,a3c,True,1000,body_mass_g,3.5837786086172367,5,1,bar,11,151.65519800000038
+population.csv,570,4,a3c,True,1000,age,1.3925695507627949,3,1,line,3,41.04254209999635
+seattle-weather.csv,1461,6,a3c,True,1000,weather,3.0748175603183476,5,2,"bar, line",9,169.26628589999746
+sp500.csv,123,2,a3c,True,1000,price,1.0032825523811837,2,2,"bar, line",1,13.878749299998162
+stocks.csv,560,3,a3c,True,1000,symbol,1.503282552381184,2,2,"bar, line",3,56.75466880000022
+unemployment-across-industries.csv,1708,6,a3c,True,1000,month,2.474817560318348,5,2,"bar, line",7,43.44298799999524
+weather.csv,2922,7,a3c,True,1000,temp_min,3.2837786086172365,5,1,bar,10,174.2434495999987
