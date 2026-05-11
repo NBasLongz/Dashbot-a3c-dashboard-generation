@@ -1,0 +1,260 @@
+﻿<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBot AI — Business Intelligence Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="js/tailwind.config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="font-inter bg-slate-50 dark:bg-[#0B1120] text-slate-800 dark:text-slate-200 overflow-hidden h-screen">
+
+    <div class="bg-orb w-[600px] h-[600px] bg-brand-500/10 top-[-200px] right-[-100px]"></div>
+    <div class="bg-orb w-[500px] h-[500px] bg-teal-500/8 bottom-[-150px] left-[-100px]"></div>
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="modal-content glass-strong rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold">Upload Dataset</h3>
+                <button onclick="closeUploadModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition"><i class="fas fa-times text-sm"></i></button>
+            </div>
+            <div id="dropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-10 text-center cursor-pointer hover:border-brand-500 transition-colors"
+                 onclick="document.getElementById('fileInput').click()"
+                 ondragover="event.preventDefault(); this.classList.add('dropzone-active')"
+                 ondragleave="this.classList.remove('dropzone-active')"
+                 ondrop="event.preventDefault(); this.classList.remove('dropzone-active'); handleFileUpload(event.dataTransfer.files[0])">
+                <i class="fas fa-cloud-arrow-up text-4xl text-brand-500 mb-4"></i>
+                <p class="font-semibold mb-1">Kéo thả file CSV vào đây</p>
+                <p class="text-sm text-slate-500">hoặc nhấp để chọn file</p>
+                <input id="fileInput" type="file" accept=".csv" class="hidden" onchange="handleFileUpload(this.files[0])">
+            </div>
+            <div id="uploadProgress" class="hidden mt-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2"><div id="uploadBar" class="bg-brand-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div></div>
+                    <span id="uploadPercent" class="text-sm font-semibold text-brand-500">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="modal-content glass-strong rounded-2xl p-6 w-full max-w-4xl mx-4 shadow-2xl max-h-[80vh] overflow-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold">Quick Preview — Raw Data</h3>
+                <button onclick="closePreviewModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition"><i class="fas fa-times text-sm"></i></button>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                <table class="w-full text-sm">
+                    <thead><tr class="bg-slate-100 dark:bg-slate-800/80">
+                        <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-slate-500">#</th>
+                    </tr></thead>
+                    <tbody id="previewTableBody"></tbody>
+                </table>
+            </div>
+            <p class="text-xs text-slate-400 mt-3">Preview dữ liệu sau khi upload CSV</p>
+        </div>
+    </div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="relative z-30 h-14 glass-strong flex items-center justify-between px-5 border-b border-slate-200/50 dark:border-white/5">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/20 anim-glow"><i class="fas fa-robot text-white text-sm"></i></div>
+                <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">DashBot AI</span>
+            </div>
+            <div class="h-5 w-px bg-slate-300 dark:bg-slate-600"></div>
+            <nav class="flex items-center gap-1.5 text-sm">
+                <span class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition">Dự án</span>
+                <i class="fas fa-chevron-right text-[10px] text-slate-400"></i>
+                <span id="datasetCrumb" class="font-semibold text-slate-700 dark:text-slate-200">No dataset</span>
+            </nav>
+        </div>
+        <div class="flex items-center gap-2.5">
+            <button onclick="openUploadModal()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/20 transition-all hover:shadow-brand-600/40 active:scale-[0.97]"><i class="fas fa-cloud-arrow-up text-xs"></i> Upload Data</button>
+            <div class="relative">
+                <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-3.5 py-2 glass rounded-xl text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition active:scale-[0.97]"><i class="fas fa-file-export text-xs text-slate-500"></i> Export <i class="fas fa-chevron-down text-[9px] text-slate-400"></i></button>
+                <div id="exportMenu" class="export-menu absolute right-0 top-full mt-2 glass-strong rounded-xl shadow-xl py-2 min-w-[150px] z-50">
+                    <button onclick="exportDashboard('SVG')" class="w-full px-4 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition"><i class="fas fa-vector-square text-xs text-slate-400"></i> SVG</button>
+                    <button onclick="exportDashboard('PNG')" class="w-full px-4 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition"><i class="fas fa-image text-xs text-slate-400"></i> PNG</button>
+                    <button onclick="exportDashboard('PDF')" class="w-full px-4 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition"><i class="fas fa-file-pdf text-xs text-slate-400"></i> PDF</button>
+                </div>
+            </div>
+            <button onclick="toggleTheme()" class="w-9 h-9 glass rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700/50 transition active:scale-[0.93]" title="Chuyển đổi giao diện"><i id="themeIcon" class="fas fa-moon text-sm text-slate-500"></i></button>
+        </div>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <div class="relative z-10 flex h-[calc(100vh-56px)]">
+
+        <!-- SECTION A -->
+        <aside class="w-64 flex-shrink-0 glass border-r border-slate-200/50 dark:border-white/5 overflow-y-auto p-4 flex flex-col gap-4 anim-slide-r">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-md bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center"><i class="fas fa-database text-xs text-brand-600 dark:text-brand-400"></i></div>
+                <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Dataset Explorer</h2>
+            </div>
+            <div class="glass-strong rounded-xl p-3.5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data Health</span>
+                    <span id="dataHealth" class="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">0%</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2.5 text-center"><p id="rowCount" class="text-lg font-extrabold text-brand-600 dark:text-brand-400">0</p><p class="text-[10px] text-slate-400 font-medium uppercase">Rows</p></div>
+                    <div class="bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2.5 text-center"><p id="columnCount" class="text-lg font-extrabold text-brand-600 dark:text-brand-400">0</p><p class="text-[10px] text-slate-400 font-medium uppercase">Columns</p></div>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fas fa-file-csv text-brand-400"></i><span id="datasetFileName">No file uploaded</span><span id="datasetFileSize" class="ml-auto">0 KB</span></div>
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Attributes</h3>
+                <div class="space-y-1" id="attributeList"></div>
+            </div>
+            <button onclick="openPreviewModal()" class="mt-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-sm font-semibold transition active:scale-[0.97]"><i class="fas fa-table text-xs text-slate-500"></i> Quick Preview</button>
+        </aside>
+
+        <!-- SECTION B -->
+        <aside class="w-72 flex-shrink-0 glass border-r border-slate-200/50 dark:border-white/5 overflow-y-auto p-4 flex flex-col gap-4 anim-slide-r delay-2">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-md bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center"><i class="fas fa-sparkles text-xs text-teal-600 dark:text-teal-400"></i></div>
+                <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Smart Insights</h2>
+            </div>
+            <p class="text-xs text-slate-400 -mt-1">A3C Agent đề xuất các hướng phân tích dựa trên Expected Return</p>
+            <div class="space-y-3" id="topicList"></div>
+        </aside>
+
+        <!-- Center -->
+        <div class="flex-1 flex flex-col min-w-0">
+
+            <!-- SECTION D -->
+            <main class="flex-1 overflow-y-auto p-5 space-y-5">
+                <div class="anim-fade-up">
+                    <h1 class="text-2xl font-extrabold tracking-tight" id="canvasTitle">Upload a CSV to generate a dashboard</h1>
+                    <p id="canvasSubtitle" class="text-sm text-slate-400 mt-1">Backend sẽ profile dữ liệu, phát hiện insight và sinh dashboard sau khi upload.</p>
+                </div>
+                <div class="grid grid-cols-4 gap-3 anim-fade-up delay-1">
+                    <div class="glass-strong rounded-xl p-4 group hover:border-brand-300 dark:hover:border-brand-700 transition-colors">
+                        <div class="flex items-center justify-between mb-2"><span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Mean</span><div class="w-7 h-7 rounded-lg bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center group-hover:scale-110 transition-transform"><i class="fas fa-chart-line text-xs text-brand-500"></i></div></div>
+                        <p class="text-2xl font-extrabold kpi-value" data-target="104.5">0</p><p class="text-[10px] text-slate-400 mt-0.5">Giá trị trung bình</p>
+                    </div>
+                    <div class="glass-strong rounded-xl p-4 group hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
+                        <div class="flex items-center justify-between mb-2"><span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Max</span><div class="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center group-hover:scale-110 transition-transform"><i class="fas fa-arrow-up text-xs text-emerald-500"></i></div></div>
+                        <p class="text-2xl font-extrabold kpi-value" data-target="230">0</p><p class="text-[10px] text-slate-400 mt-0.5">Giá trị lớn nhất</p>
+                    </div>
+                    <div class="glass-strong rounded-xl p-4 group hover:border-amber-300 dark:hover:border-amber-700 transition-colors">
+                        <div class="flex items-center justify-between mb-2"><span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Min</span><div class="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center group-hover:scale-110 transition-transform"><i class="fas fa-arrow-down text-xs text-amber-500"></i></div></div>
+                        <p class="text-2xl font-extrabold kpi-value" data-target="46">0</p><p class="text-[10px] text-slate-400 mt-0.5">Giá trị nhỏ nhất</p>
+                    </div>
+                    <div class="glass-strong rounded-xl p-4 group hover:border-rose-300 dark:hover:border-rose-700 transition-colors">
+                        <div class="flex items-center justify-between mb-2"><span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cardinality</span><div class="w-7 h-7 rounded-lg bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center group-hover:scale-110 transition-transform"><i class="fas fa-fingerprint text-xs text-rose-500"></i></div></div>
+                        <p class="text-2xl font-extrabold kpi-value" data-target="94">0</p><p class="text-[10px] text-slate-400 mt-0.5">Giá trị duy nhất</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4" id="chartGrid"></div>
+            </main>
+
+            <!-- ===== SECTION C & E: Bottom Panel — xếp chồng theo cột ===== -->
+            <div class="h-56 flex-shrink-0 border-t border-slate-200/50 dark:border-white/5 glass flex">
+
+                <!-- Section C: Chart Editor — XẾP CHỒNG DỌC -->
+                <div class="w-[340px] flex-shrink-0 p-3.5 border-r border-slate-200/50 dark:border-white/5 flex flex-col">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-4 h-4 rounded bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center"><i class="fas fa-pen-ruler text-[8px] text-orange-500"></i></div>
+                            <h3 class="font-bold text-[11px] uppercase tracking-wider text-slate-400">Chart Editor</h3>
+                            <span class="text-[8px] font-semibold text-orange-500 bg-orange-100 dark:bg-orange-900/30 px-1.5 py-0.5 rounded-md">Constrained</span>
+                        </div>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <span class="text-[10px] font-semibold text-slate-400">Edit</span>
+                            <div class="relative" onclick="toggleEditMode()">
+                                <div id="editToggleTrack" class="w-8 h-4 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors"></div>
+                                <div id="editToggleThumb" class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"></div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Editor Controls — Xếp chồng dọc -->
+                    <div id="editorControls" class="flex-1 opacity-40 pointer-events-none transition-opacity flex flex-col gap-1.5 overflow-y-auto">
+
+                        <!-- Row 1: Mark Type -->
+                        <div class="editor-row">
+                            <label>Mark</label>
+                            <select id="markType" onchange="applyConstrainedSampling()">
+                                <option value="bar">Bar</option>
+                                <option value="point">Scatter</option>
+                                <option value="line" id="optLine">Line</option>
+                                <option value="boxplot" id="optBoxplot">Boxplot</option>
+                            </select>
+                            <div></div>
+                        </div>
+
+                        <!-- Row 2: X-axis Field -->
+                        <div class="editor-row">
+                            <label>X-axis</label>
+                            <select id="xAxis" onchange="onAxisChange('x')"><option value="">Upload CSV first</option></select>
+                            <select id="xAgg" onchange="applyConstrainedSampling()" class="editor-agg-select">
+                                <option value="mean">Mean</option>
+                                <option value="max">Max</option>
+                                <option value="min">Min</option>
+                                <option value="count">Count</option>
+                                <option value="bin">Bin</option>
+                            </select>
+                        </div>
+
+                        <!-- Row 3: Y-axis Field -->
+                        <div class="editor-row">
+                            <label>Y-axis</label>
+                            <select id="yAxis" onchange="onAxisChange('y')"><option value="">Upload CSV first</option></select>
+                            <select id="yAgg" onchange="applyConstrainedSampling()" class="editor-agg-select">
+                                <option value="mean">Mean</option>
+                                <option value="max">Max</option>
+                                <option value="min">Min</option>
+                                <option value="count">Count</option>
+                                <option value="bin">Bin</option>
+                            </select>
+                        </div>
+
+                        <!-- Row 4: Color -->
+                        <div class="editor-row">
+                            <label>Color</label>
+                            <select id="colorField"><option value="none">None</option></select>
+                            <div></div>
+                        </div>
+
+                        <!-- Apply Button -->
+                        <button onclick="applyChartConfig()" class="mt-1 w-full py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow transition active:scale-[0.97]">
+                            <i class="fas fa-check mr-1"></i> Apply Configuration
+                        </button>
+
+                        <!-- Constraint Alert -->
+                        <div id="constraintAlert" class="constraint-alert items-start gap-1.5 px-2.5 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg">
+                            <i class="fas fa-lock text-red-500 text-[9px] mt-0.5"></i>
+                            <span id="constraintMsg" class="text-[10px] font-medium text-red-600 dark:text-red-400 leading-snug"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section E: Recommendation View -->
+                <div class="flex-1 p-4 flex flex-col">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-5 h-5 rounded-md bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center"><i class="fas fa-wand-magic-sparkles text-[10px] text-amber-500"></i></div>
+                        <h3 class="font-bold text-xs uppercase tracking-wider text-slate-400">AI thinks you might also like...</h3>
+                    </div>
+                    <div class="flex-1 flex gap-3 overflow-x-auto pb-1" id="recContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
+
+
+
