@@ -1,0 +1,24 @@
+paper:
+  max_columns: 10
+  max_episode_steps: 50
+  generation_steps: 1000
+  online_recommendation_steps: 200
+  training_steps: 500000
+
+reward:
+  alpha: 3.0
+  n_best: 4
+  n_max: 8
+  w_diversity: 0.33
+  w_parsimony: 0.33
+  w_insight: 0.1
+  correlation_threshold: 0.5
+  top_k: 5
+
+agent:
+  optimizer: Adam
+  learning_rate: 0.0001
+  bilstm_hidden_size: 128
+  entropy_coef: 0.01
+  value_loss_coef: 0.5
+  gamma: 1.0
