@@ -87,7 +87,20 @@ class DashboardEnv:
         valid_names = {column.name for column in self.profile.modeled_columns()}
         if key_column not in valid_names:
             key_column = next(iter(valid_names))
+        previous_key_column = self.state.key_column
         self.state.key_column = key_column
+        if previous_key_column and previous_key_column != key_column:
+            for chart in self.state.charts:
+                self._replace_chart_field(chart, previous_key_column, key_column)
+
+    @staticmethod
+    def _replace_chart_field(chart: ChartSpec, old_field: str, new_field: str) -> None:
+        if chart.x == old_field:
+            chart.x = new_field
+        if chart.y == old_field:
+            chart.y = new_field
+        if chart.color == old_field:
+            chart.color = new_field
 
     def _add_chart(self, chart: ChartSpec) -> None:
         self.state.charts.append(chart)

@@ -26,6 +26,7 @@ class RecommendationResponse(BaseModel):
     reward: float
     profile: dict[str, Any]
     charts: list[ChartResponse]
+    recommendations: list[ChartResponse] = Field(default_factory=list)
     insights: list[dict[str, Any]]
 
 

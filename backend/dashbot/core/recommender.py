@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 
 import pandas as pd
 
@@ -45,17 +46,13 @@ class GreedyDashboardRecommender:
 
         insights = InsightDetector().detect_dashboard(frame, profile, selected)
         key_column = self._choose_key_column(profile, selected)
+        recommendations = self._recommendation_charts(frame, profile, selected, candidates)
         return {
             "key_column": key_column,
             "reward": self.reward_engine.dashboard_reward(frame, profile, selected),
             "profile": profile.to_dict(),
-            "charts": [
-                {
-                    **chart.to_dict(),
-                    "vega_lite": self.chart_generator.to_vega_lite(chart, profile=profile),
-                }
-                for chart in selected
-            ],
+            "charts": [self._chart_response(chart, profile) for chart in selected],
+            "recommendations": [self._chart_response(chart, profile) for chart in recommendations],
             "insights": [insight.to_dict() for insight in insights],
         }
 
@@ -96,3 +93,64 @@ class GreedyDashboardRecommender:
             charts.append(ChartSpec("boxplot", x=n, y=q, title=f"{q} distribution by {n}"))
 
         return charts
+
+    def _recommendation_charts(
+        self,
+        frame: pd.DataFrame,
+        profile: DatasetProfile,
+        selected: list[ChartSpec],
+        candidates: list[ChartSpec],
+        limit: int = 4,
+    ) -> list[ChartSpec]:
+        used = {self._chart_signature(chart) for chart in selected}
+        selected_marks = {chart.mark for chart in selected}
+        selected_fields = {field for chart in selected for field in chart.fields()}
+        unique_candidates = self._dedupe_charts(chart for chart in candidates if self._chart_signature(chart) not in used)
+        unique_candidates.sort(
+            key=lambda chart: self._candidate_score(frame, profile, selected, chart, selected_marks, selected_fields),
+            reverse=True,
+        )
+        return unique_candidates[:limit]
+
+    def _candidate_score(
+        self,
+        frame: pd.DataFrame,
+        profile: DatasetProfile,
+        selected: list[ChartSpec],
+        chart: ChartSpec,
+        selected_marks: set[str],
+        selected_fields: set[str],
+    ) -> float:
+        reward = self.reward_engine.dashboard_reward(frame, profile, selected + [chart])
+        type_bonus = 0.4 if chart.mark not in selected_marks else 0.0
+        field_bonus = 0.05 * len(set(chart.fields()) - selected_fields)
+        insight_bonus = 0.08 * len(InsightDetector().detect_for_chart(frame, profile, chart))
+        return reward + type_bonus + field_bonus + insight_bonus
+
+    def _chart_response(self, chart: ChartSpec, profile: DatasetProfile) -> dict:
+        return {
+            **chart.to_dict(),
+            "vega_lite": self.chart_generator.to_vega_lite(chart, profile=profile),
+        }
+
+    @classmethod
+    def _dedupe_charts(cls, charts: Iterable[ChartSpec]) -> list[ChartSpec]:
+        selected: list[ChartSpec] = []
+        used = set()
+        for chart in charts:
+            signature = cls._chart_signature(chart)
+            if signature in used:
+                continue
+            selected.append(chart)
+            used.add(signature)
+        return selected
+
+    @staticmethod
+    def _chart_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None, str | None]:
+        return (
+            chart.mark,
+            chart.x,
+            chart.y,
+            chart.x_agg,
+            chart.y_agg,
+        )

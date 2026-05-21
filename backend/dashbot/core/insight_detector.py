@@ -81,11 +81,12 @@ class InsightDetector:
         for chart in charts:
             insights.extend(self.detect_for_chart(frame, profile, chart))
 
-        insights.extend(self._co_correlations(frame, profile))
+        insights.extend(self._co_correlations_from_chart_insights(insights))
         insights.extend(self._comparisons(insights))
         return insights
 
     def _co_correlations(self, frame: pd.DataFrame, profile: DatasetProfile) -> list[Insight]:
+        """Dataset-level co-correlation helper kept for exploratory analysis."""
         quantitative = [column.name for column in profile.columns if column.type == "Q"]
         results: list[Insight] = []
         for a, b, c in itertools.combinations(quantitative, 3):
@@ -98,6 +99,39 @@ class InsightDetector:
                         (a, b, c),
                         min(corr_ab, corr_ac),
                         f"{b} and {c} are both correlated with {a}",
+                        3,
+                    )
+                )
+        return results
+
+    def _co_correlations_from_chart_insights(self, insights: list[Insight]) -> list[Insight]:
+        correlations = [insight for insight in insights if insight.type == "correlation" and len(insight.columns) == 2]
+        by_anchor: dict[str, list[Insight]] = {}
+        for insight in correlations:
+            left, right = insight.columns
+            by_anchor.setdefault(left, []).append(insight)
+            by_anchor.setdefault(right, []).append(insight)
+
+        results: list[Insight] = []
+        seen: set[tuple[str, str, str]] = set()
+        for anchor, related in by_anchor.items():
+            if len(related) < 2:
+                continue
+            for first, second in itertools.combinations(related, 2):
+                other_first = first.columns[1] if first.columns[0] == anchor else first.columns[0]
+                other_second = second.columns[1] if second.columns[0] == anchor else second.columns[0]
+                if other_first == other_second:
+                    continue
+                columns = tuple(sorted((anchor, other_first, other_second)))
+                if columns in seen:
+                    continue
+                seen.add(columns)
+                results.append(
+                    Insight(
+                        "co-correlation",
+                        columns,
+                        min(first.score, second.score),
+                        f"{other_first} and {other_second} are both correlated with {anchor}",
                         3,
                     )
                 )
