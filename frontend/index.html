@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="vi" class="dark">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,7 +21,7 @@
     <div id="uploadModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div class="modal-content glass-strong rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
             <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-bold">Upload Dataset</h3>
+                <h3 class="text-lg font-bold">Upload Data</h3>
                 <button onclick="closeUploadModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition"><i class="fas fa-times text-sm"></i></button>
             </div>
             <div id="dropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-10 text-center cursor-pointer hover:border-brand-500 transition-colors"
@@ -47,7 +47,7 @@
     <div id="previewModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div class="modal-content glass-strong rounded-2xl p-6 w-full max-w-4xl mx-4 shadow-2xl max-h-[80vh] overflow-auto">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold">Quick Preview — Raw Data</h3>
+                <h3 class="text-lg font-bold">Table View — Raw Data</h3>
                 <button onclick="closePreviewModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition"><i class="fas fa-times text-sm"></i></button>
             </div>
             <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
@@ -58,7 +58,7 @@
                     <tbody id="previewTableBody"></tbody>
                 </table>
             </div>
-            <p class="text-xs text-slate-400 mt-3">Preview dữ liệu sau khi upload CSV</p>
+            <p id="previewTableNote" class="text-xs text-slate-400 mt-3">Raw data will appear after upload.</p>
         </div>
     </div>
 
@@ -77,9 +77,9 @@
             </nav>
         </div>
         <div class="flex items-center gap-2.5">
-            <button onclick="openUploadModal()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/20 transition-all hover:shadow-brand-600/40 active:scale-[0.97]"><i class="fas fa-cloud-arrow-up text-xs"></i> Upload Data</button>
+            <button onclick="openUploadModal()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/20 transition-all hover:shadow-brand-600/40 active:scale-[0.97]"><i class="fas fa-cloud-arrow-up text-xs"></i> Upload</button>
             <div class="relative">
-                <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-3.5 py-2 glass rounded-xl text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition active:scale-[0.97]"><i class="fas fa-file-export text-xs text-slate-500"></i> Export <i class="fas fa-chevron-down text-[9px] text-slate-400"></i></button>
+                <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-3.5 py-2 glass rounded-xl text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition active:scale-[0.97]"><i class="fas fa-file-export text-xs text-slate-500"></i> Save <i class="fas fa-chevron-down text-[9px] text-slate-400"></i></button>
                 <div id="exportMenu" class="export-menu absolute right-0 top-full mt-2 glass-strong rounded-xl shadow-xl py-2 min-w-[150px] z-50">
                     <button onclick="exportDashboard('SVG')" class="w-full px-4 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition"><i class="fas fa-vector-square text-xs text-slate-400"></i> SVG</button>
                     <button onclick="exportDashboard('PNG')" class="w-full px-4 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition"><i class="fas fa-image text-xs text-slate-400"></i> PNG</button>
@@ -97,11 +97,11 @@
         <aside class="w-64 flex-shrink-0 glass border-r border-slate-200/50 dark:border-white/5 overflow-y-auto p-4 flex flex-col gap-4 anim-slide-r">
             <div class="flex items-center gap-2">
                 <div class="w-6 h-6 rounded-md bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center"><i class="fas fa-database text-xs text-brand-600 dark:text-brand-400"></i></div>
-                <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Dataset Explorer</h2>
+                <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Table View</h2>
             </div>
             <div class="glass-strong rounded-xl p-3.5 space-y-3">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data Health</span>
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data</span>
                     <span id="dataHealth" class="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">0%</span>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -111,20 +111,93 @@
                 <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fas fa-file-csv text-brand-400"></i><span id="datasetFileName">No file uploaded</span><span id="datasetFileSize" class="ml-auto">0 KB</span></div>
             </div>
             <div>
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Attributes</h3>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Columns</h3>
                 <div class="space-y-1" id="attributeList"></div>
             </div>
-            <button onclick="openPreviewModal()" class="mt-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-sm font-semibold transition active:scale-[0.97]"><i class="fas fa-table text-xs text-slate-500"></i> Quick Preview</button>
+            <button onclick="openPreviewModal()" class="mt-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-sm font-semibold transition active:scale-[0.97]"><i class="fas fa-table text-xs text-slate-500"></i> View Data</button>
         </aside>
 
-        <!-- SECTION B -->
-        <aside class="w-72 flex-shrink-0 glass border-r border-slate-200/50 dark:border-white/5 overflow-y-auto p-4 flex flex-col gap-4 anim-slide-r delay-2">
-            <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-md bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center"><i class="fas fa-sparkles text-xs text-teal-600 dark:text-teal-400"></i></div>
-                <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Smart Insights</h2>
+        <!-- SECTION B + C -->
+        <aside class="w-[340px] flex-shrink-0 glass border-r border-slate-200/50 dark:border-white/5 flex flex-col anim-slide-r delay-2">
+            <!-- Section B: Topic List -->
+            <div class="p-4 border-b border-slate-200/50 dark:border-white/5 flex flex-col gap-4 min-h-[260px] h-[42%]">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-md bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center"><i class="fas fa-sparkles text-xs text-teal-600 dark:text-teal-400"></i></div>
+                    <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Topic List</h2>
+                </div>
+                <p class="text-xs text-slate-400 -mt-1">A3C Agent đề xuất các hướng phân tích dựa trên Expected Return</p>
+                <div class="space-y-3 overflow-y-auto pr-1" id="topicList"></div>
             </div>
-            <p class="text-xs text-slate-400 -mt-1">A3C Agent đề xuất các hướng phân tích dựa trên Expected Return</p>
-            <div class="space-y-3" id="topicList"></div>
+
+            <!-- Section C: Chart Editor -->
+            <div class="p-3.5 flex-1 min-h-0 flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-1.5">
+                        <div class="w-4 h-4 rounded bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center"><i class="fas fa-pen-ruler text-[8px] text-orange-500"></i></div>
+                        <h3 class="font-bold text-[11px] uppercase tracking-wider text-slate-400">Chart Editor</h3>
+                        <span class="text-[8px] font-semibold text-orange-500 bg-orange-100 dark:bg-orange-900/30 px-1.5 py-0.5 rounded-md">Constrained</span>
+                    </div>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <span class="text-[10px] font-semibold text-slate-400">Edit</span>
+                        <div class="relative" onclick="toggleEditMode()">
+                            <div id="editToggleTrack" class="w-8 h-4 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors"></div>
+                            <div id="editToggleThumb" class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div id="editorControls" class="flex-1 opacity-40 pointer-events-none transition-opacity flex flex-col gap-1.5 overflow-y-auto">
+                    <div class="editor-row">
+                        <label>Mark</label>
+                        <select id="markType" onchange="applyConstrainedSampling()">
+                            <option value="bar">Bar</option>
+                            <option value="point">Scatter</option>
+                            <option value="line" id="optLine">Line</option>
+                            <option value="boxplot" id="optBoxplot">Boxplot</option>
+                        </select>
+                        <div></div>
+                    </div>
+
+                    <div class="editor-row">
+                        <label>X-axis</label>
+                        <select id="xAxis" onchange="onAxisChange('x')"><option value="">Upload CSV first</option></select>
+                        <select id="xAgg" onchange="applyConstrainedSampling()" class="editor-agg-select">
+                            <option value="mean">Mean</option>
+                            <option value="max">Max</option>
+                            <option value="min">Min</option>
+                            <option value="count">Count</option>
+                            <option value="bin">Bin</option>
+                        </select>
+                    </div>
+
+                    <div class="editor-row">
+                        <label>Y-axis</label>
+                        <select id="yAxis" onchange="onAxisChange('y')"><option value="">Upload CSV first</option></select>
+                        <select id="yAgg" onchange="applyConstrainedSampling()" class="editor-agg-select">
+                            <option value="mean">Mean</option>
+                            <option value="max">Max</option>
+                            <option value="min">Min</option>
+                            <option value="count">Count</option>
+                            <option value="bin">Bin</option>
+                        </select>
+                    </div>
+
+                    <div class="editor-row">
+                        <label>Color</label>
+                        <select id="colorField"><option value="none">None</option></select>
+                        <div></div>
+                    </div>
+
+                    <button onclick="applyChartConfig()" class="mt-1 w-full py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow transition active:scale-[0.97]">
+                        <i class="fas fa-check mr-1"></i> Apply Configuration
+                    </button>
+
+                    <div id="constraintAlert" class="constraint-alert items-start gap-1.5 px-2.5 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg">
+                        <i class="fas fa-lock text-red-500 text-[9px] mt-0.5"></i>
+                        <span id="constraintMsg" class="text-[10px] font-medium text-red-600 dark:text-red-400 leading-snug"></span>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- Center -->
@@ -157,93 +230,12 @@
                 <div class="grid grid-cols-3 gap-4" id="chartGrid"></div>
             </main>
 
-            <!-- ===== SECTION C & E: Bottom Panel — xếp chồng theo cột ===== -->
-            <div class="h-56 flex-shrink-0 border-t border-slate-200/50 dark:border-white/5 glass flex">
-
-                <!-- Section C: Chart Editor — XẾP CHỒNG DỌC -->
-                <div class="w-[340px] flex-shrink-0 p-3.5 border-r border-slate-200/50 dark:border-white/5 flex flex-col">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-1.5">
-                            <div class="w-4 h-4 rounded bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center"><i class="fas fa-pen-ruler text-[8px] text-orange-500"></i></div>
-                            <h3 class="font-bold text-[11px] uppercase tracking-wider text-slate-400">Chart Editor</h3>
-                            <span class="text-[8px] font-semibold text-orange-500 bg-orange-100 dark:bg-orange-900/30 px-1.5 py-0.5 rounded-md">Constrained</span>
-                        </div>
-                        <label class="flex items-center gap-1.5 cursor-pointer">
-                            <span class="text-[10px] font-semibold text-slate-400">Edit</span>
-                            <div class="relative" onclick="toggleEditMode()">
-                                <div id="editToggleTrack" class="w-8 h-4 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors"></div>
-                                <div id="editToggleThumb" class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"></div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <!-- Editor Controls — Xếp chồng dọc -->
-                    <div id="editorControls" class="flex-1 opacity-40 pointer-events-none transition-opacity flex flex-col gap-1.5 overflow-y-auto">
-
-                        <!-- Row 1: Mark Type -->
-                        <div class="editor-row">
-                            <label>Mark</label>
-                            <select id="markType" onchange="applyConstrainedSampling()">
-                                <option value="bar">Bar</option>
-                                <option value="point">Scatter</option>
-                                <option value="line" id="optLine">Line</option>
-                                <option value="boxplot" id="optBoxplot">Boxplot</option>
-                            </select>
-                            <div></div>
-                        </div>
-
-                        <!-- Row 2: X-axis Field -->
-                        <div class="editor-row">
-                            <label>X-axis</label>
-                            <select id="xAxis" onchange="onAxisChange('x')"><option value="">Upload CSV first</option></select>
-                            <select id="xAgg" onchange="applyConstrainedSampling()" class="editor-agg-select">
-                                <option value="mean">Mean</option>
-                                <option value="max">Max</option>
-                                <option value="min">Min</option>
-                                <option value="count">Count</option>
-                                <option value="bin">Bin</option>
-                            </select>
-                        </div>
-
-                        <!-- Row 3: Y-axis Field -->
-                        <div class="editor-row">
-                            <label>Y-axis</label>
-                            <select id="yAxis" onchange="onAxisChange('y')"><option value="">Upload CSV first</option></select>
-                            <select id="yAgg" onchange="applyConstrainedSampling()" class="editor-agg-select">
-                                <option value="mean">Mean</option>
-                                <option value="max">Max</option>
-                                <option value="min">Min</option>
-                                <option value="count">Count</option>
-                                <option value="bin">Bin</option>
-                            </select>
-                        </div>
-
-                        <!-- Row 4: Color -->
-                        <div class="editor-row">
-                            <label>Color</label>
-                            <select id="colorField"><option value="none">None</option></select>
-                            <div></div>
-                        </div>
-
-                        <!-- Apply Button -->
-                        <button onclick="applyChartConfig()" class="mt-1 w-full py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow transition active:scale-[0.97]">
-                            <i class="fas fa-check mr-1"></i> Apply Configuration
-                        </button>
-
-                        <!-- Constraint Alert -->
-                        <div id="constraintAlert" class="constraint-alert items-start gap-1.5 px-2.5 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg">
-                            <i class="fas fa-lock text-red-500 text-[9px] mt-0.5"></i>
-                            <span id="constraintMsg" class="text-[10px] font-medium text-red-600 dark:text-red-400 leading-snug"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section E: Recommendation View -->
-                <div class="flex-1 p-4 flex flex-col">
+            <!-- SECTION E: Recommendation View -->
+            <div class="h-56 flex-shrink-0 border-t border-slate-200/50 dark:border-white/5 glass">
+                <div class="h-full p-4 flex flex-col">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-5 h-5 rounded-md bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center"><i class="fas fa-wand-magic-sparkles text-[10px] text-amber-500"></i></div>
-                        <h3 class="font-bold text-xs uppercase tracking-wider text-slate-400">AI thinks you might also like...</h3>
+                        <h3 class="font-bold text-xs uppercase tracking-wider text-slate-400">Recommendations</h3>
                     </div>
                     <div class="flex-1 flex gap-3 overflow-x-auto pb-1" id="recContainer"></div>
                 </div>
