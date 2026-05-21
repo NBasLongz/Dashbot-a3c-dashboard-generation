@@ -53,6 +53,7 @@ def main() -> None:
     parser.add_argument("--value-loss-coef", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--use-transformed-features", action="store_true")
     parser.add_argument("--log-interval", type=int, default=5000)
     parser.add_argument("--log-csv", type=Path, default=ROOT / "reports" / "training_curve_a3c.csv")
     parser.add_argument("--checkpoint-interval", type=int, default=50000)
@@ -139,7 +140,8 @@ def worker_main(
             counter.value += 1
             global_step = counter.value
 
-        state_tensor = feature_encoder.encode(state, env.profile, shuffle_charts=True).unsqueeze(0)
+        feature_frame = env.frame if args.use_transformed_features else None
+        state_tensor = feature_encoder.encode(state, env.profile, shuffle_charts=True, frame=feature_frame).unsqueeze(0)
         outputs = local_model(state_tensor)
         decision = policy.sample(outputs, state, env.profile)
         next_state, reward, done, _ = env.step(decision.action, decision.params)

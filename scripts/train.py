@@ -31,6 +31,7 @@ def main() -> None:
     parser.add_argument("--value-loss-coef", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--use-transformed-features", action="store_true")
     parser.add_argument("--save-path", type=Path, default=ROOT / "backend" / "dashbot" / "weights" / "dashbot_actor_critic.pth")
     args = parser.parse_args()
 
@@ -68,7 +69,8 @@ def main() -> None:
     completed_episodes = 0
 
     for global_step in range(1, args.steps + 1):
-        state_tensor = feature_encoder.encode(state, env.profile, shuffle_charts=True).unsqueeze(0)
+        feature_frame = env.frame if args.use_transformed_features else None
+        state_tensor = feature_encoder.encode(state, env.profile, shuffle_charts=True, frame=feature_frame).unsqueeze(0)
         outputs = model(state_tensor)
         decision = policy.sample(outputs, state, env.profile)
         next_state, reward, done, info = env.step(decision.action, decision.params)
