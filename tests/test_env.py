@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from dashbot.rl_env.dashboard_env import DashboardEnv
+from dashbot.core.models import ChartSpec
 
 
 def test_environment_add_chart_returns_reward() -> None:
@@ -27,3 +28,22 @@ def test_environment_add_chart_returns_reward() -> None:
     assert len(state.charts) == 1
     assert isinstance(reward, float)
     assert done is False
+
+
+def test_change_key_column_replaces_existing_chart_fields() -> None:
+    frame = pd.DataFrame(
+        {
+            "origin": ["USA", "USA", "Japan", "Japan"],
+            "maker": ["A", "B", "C", "D"],
+            "horsepower": [100, 120, 80, 90],
+        }
+    )
+    env = DashboardEnv(frame)
+    env.reset("origin")
+    env.step("add", {"chart": ChartSpec("bar", x="origin", y="horsepower", y_agg="mean")})
+
+    state, _, _, info = env.step("change", {"key_column": "maker"})
+
+    assert not info["invalid"]
+    assert state.key_column == "maker"
+    assert state.charts[0].x == "maker"
