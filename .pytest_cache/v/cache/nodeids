@@ -1,7 +1,9 @@
 [
   "tests/test_a3c_recommender.py::test_a3c_recommender_returns_dashboard_payload",
+  "tests/test_env.py::test_change_key_column_replaces_existing_chart_fields",
   "tests/test_env.py::test_environment_add_chart_returns_reward",
   "tests/test_feature_encoder.py::test_state_feature_encoder_shape_is_stable",
+  "tests/test_insight_detector.py::test_co_correlation_requires_chart_level_correlations",
   "tests/test_profiler.py::test_profiler_infers_basic_types",
   "tests/test_rewards.py::test_column_diversity_is_positive",
   "tests/test_rewards.py::test_correlation_chart_gets_insight_reward",
