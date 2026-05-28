@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -120,7 +120,7 @@
         <!-- SECTION B + C -->
         <aside class="w-[340px] flex-shrink-0 glass border-r border-slate-200/50 dark:border-white/5 flex flex-col anim-slide-r delay-2">
             <!-- Section B: Topic List -->
-            <div class="p-4 border-b border-slate-200/50 dark:border-white/5 flex flex-col gap-4 min-h-[260px] h-[42%]">
+            <div id="topicListSection" class="p-4 flex flex-col gap-4 min-h-[160px] h-[42%]">
                 <div class="flex items-center gap-2">
                     <div class="w-6 h-6 rounded-md bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center"><i class="fas fa-sparkles text-xs text-teal-600 dark:text-teal-400"></i></div>
                     <h2 class="font-bold text-sm uppercase tracking-wider text-slate-500">Topic List</h2>
@@ -128,6 +128,9 @@
                 <p class="text-xs text-slate-400 -mt-1">A3C Agent đề xuất các hướng phân tích dựa trên Expected Return</p>
                 <div class="space-y-3 overflow-y-auto pr-1" id="topicList"></div>
             </div>
+
+            <!-- Resizer divider -->
+            <div id="sidebar-resizer" class="h-1 bg-slate-200 dark:bg-slate-800/80 hover:bg-brand-500 dark:hover:bg-brand-500 cursor-row-resize transition-all duration-150 relative z-30" title="Kéo để điều chỉnh kích thước"></div>
 
             <!-- Section C: Chart Editor -->
             <div class="p-3.5 flex-1 min-h-0 flex flex-col">

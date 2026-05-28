@@ -150,7 +150,7 @@ function updateEditorOptions(columns) {
 function renderAttributes() {
     const tc = { Q: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400', N: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400', T: 'bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400' };
     document.getElementById('attributeList').innerHTML = attributes.length
-        ? attributes.map(a => `<div class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer transition group"><span class="w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center ${tc[a.type]}">${a.type}</span><span class="text-sm font-medium flex-1">${a.name}</span><span class="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">${a.desc || ''}</span></div>`).join('')
+        ? attributes.map(a => `<div onclick="selectColumnAsTopic('${a.key}')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer transition group"><span class="w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center ${tc[a.type]}">${a.type}</span><span class="text-sm font-medium flex-1">${a.name}</span><span class="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">${a.desc || ''}</span></div>`).join('')
         : '<div class="text-xs text-slate-400 px-2 py-3">Upload data to view columns.</div>';
 }
 
@@ -210,7 +210,20 @@ function renderDashboardCharts() {
     }
     grid.innerHTML = currentCharts.map((chart, i) => {
         const badge = chart.insight_type || inferInsightLabel(chart);
-        return `<div class="chart-card glass-strong rounded-xl p-4 anim-fade-up"><div class="flex items-center justify-between mb-3"><h4 class="text-sm font-bold leading-tight pr-2">${chart.title || chartTitle(chart)}</h4><span class="${BADGE_CLASS[badge] || 'badge-correlation'} text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">${badge}</span></div><div class="h-44"><canvas id="chart${i}"></canvas></div></div>`;
+        return `<div class="chart-card glass-strong rounded-xl p-4 anim-fade-up">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-bold leading-tight pr-2">${chart.title || chartTitle(chart)}</h4>
+                <div class="flex items-center gap-1.5">
+                    <span class="${BADGE_CLASS[badge] || 'badge-correlation'} text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">${badge}</span>
+                    <button onclick="removeFromCanvas(${i})" class="text-slate-400 hover:text-red-500 transition duration-150 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Xóa biểu đồ">
+                        <i class="fas fa-trash-alt text-[11px]"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="h-44">
+                <canvas id="chart${i}"></canvas>
+            </div>
+        </div>`;
     }).join('');
     currentCharts.forEach((chart, i) => { chartInstances[`chart${i}`] = new Chart(document.getElementById(`chart${i}`), chartToChartJs(chart, false)); });
 }
@@ -505,10 +518,76 @@ function inferInsightLabel(chart) {
 }
 
 function selectTopic(index) {
+    const oldKey = topics.find(t => t.active)?.id;
+    const newKey = topics[index].id;
     topics.forEach((t, i) => t.active = i === index);
     renderTopics();
-    renderCanvasTitle(topics[index].id);
-    updateKPIs(topics[index].id);
+    renderCanvasTitle(newKey);
+    updateKPIs(newKey);
+
+    if (oldKey && oldKey !== newKey) {
+        let changedAny = false;
+        currentCharts.forEach(chart => {
+            let changed = false;
+            if (chart.x === oldKey) { chart.x = newKey; changed = true; }
+            if (chart.y === oldKey) { chart.y = newKey; changed = true; }
+            if (chart.color === oldKey) { chart.color = newKey; changed = true; }
+            if (changed) {
+                chart.title = chartTitle(chart);
+                changedAny = true;
+            }
+        });
+        if (changedAny) {
+            currentCharts = uniqueCharts(currentCharts);
+            currentCharts = currentCharts.filter(chart => !(chart.x && chart.y && chart.x === chart.y && chart.x_agg !== 'bin'));
+            renderDashboardCharts();
+            showToast(`Đã thay thế cột khóa "${oldKey}" thành "${newKey}" trên các biểu đồ.`, 'success');
+        }
+    }
+}
+
+function selectColumnAsTopic(key) {
+    if (!key) return;
+    const oldKey = topics.find(t => t.active)?.id;
+    if (oldKey === key) return;
+
+    const existingIndex = topics.findIndex(t => t.id === key);
+    if (existingIndex !== -1) {
+        selectTopic(existingIndex);
+    } else {
+        topics.forEach(t => t.active = false);
+        topics.unshift({
+            id: key,
+            title: `Insights about ${displayName(key)}`,
+            score: 1.0,
+            badges: ['distribution'],
+            charts: ['fa-chart-bar', 'fa-chart-line'],
+            active: true
+        });
+        renderTopics();
+        renderCanvasTitle(key);
+        updateKPIs(key);
+
+        if (oldKey) {
+            let changedAny = false;
+            currentCharts.forEach(chart => {
+                let changed = false;
+                if (chart.x === oldKey) { chart.x = key; changed = true; }
+                if (chart.y === oldKey) { chart.y = key; changed = true; }
+                if (chart.color === oldKey) { chart.color = key; changed = true; }
+                if (changed) {
+                    chart.title = chartTitle(chart);
+                    changedAny = true;
+                }
+            });
+            if (changedAny) {
+                currentCharts = uniqueCharts(currentCharts);
+                currentCharts = currentCharts.filter(chart => !(chart.x && chart.y && chart.x === chart.y && chart.x_agg !== 'bin'));
+                renderDashboardCharts();
+                showToast(`Đã thay thế cột khóa "${oldKey}" thành "${key}" trên các biểu đồ.`, 'success');
+            }
+        }
+    }
 }
 
 function toggleTheme() {
@@ -569,7 +648,16 @@ function addToCanvas(index) {
     showToast(`Da them "${rec.title || chartTitle(rec)}" vao Canvas.`, 'success');
 }
 
-function exportDashboard(format) {
+function removeFromCanvas(index) {
+    if (index >= 0 && index < currentCharts.length) {
+        const title = currentCharts[index].title || chartTitle(currentCharts[index]);
+        currentCharts.splice(index, 1);
+        renderDashboardCharts();
+        showToast(`Da xoa "${title}" khoi Canvas.`, 'info');
+    }
+}
+
+async function exportDashboard(format) {
     const menu = document.getElementById('exportMenu');
     if (!currentCharts.length) {
         menu.classList.remove('show');
@@ -577,12 +665,190 @@ function exportDashboard(format) {
         return;
     }
     menu.classList.remove('show');
-    const blob = new Blob([JSON.stringify({ dataset: currentDatasetName, charts: currentCharts }, null, 2)], { type: 'application/json' });
+    const normalizedFormat = String(format).toUpperCase();
+    const fileName = `dashbot-${safeFileName(currentDatasetName || 'dashboard')}`;
+
+    if (normalizedFormat === 'PDF') {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            showToast('Trinh duyet dang chan popup PDF.', 'warn');
+            return;
+        }
+        const pngDataUrl = await createDashboardExportCanvas().then(canvas => canvas.toDataURL('image/png'));
+        printWindow.document.write(`
+            <!doctype html>
+            <html>
+            <head>
+                <title>${fileName}.pdf</title>
+                <style>
+                    body { margin: 0; padding: 24px; background: #f8fafc; font-family: Inter, Arial, sans-serif; }
+                    img { width: 100%; max-width: 1400px; display: block; margin: 0 auto; }
+                    @media print { body { padding: 0; background: white; } img { max-width: 100%; } }
+                </style>
+            </head>
+            <body>
+                <img src="${pngDataUrl}" alt="DashBot dashboard export">
+                <script>window.onload = () => setTimeout(() => window.print(), 250);<\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        showToast('PDF da mo o cua so in. Chon Save as PDF de luu.', 'info');
+        return;
+    }
+
+    if (normalizedFormat === 'SVG') {
+        downloadBlob(
+            new Blob([createDashboardSvg()], { type: 'image/svg+xml;charset=utf-8' }),
+            `${fileName}.svg`
+        );
+        showToast('Da tai dashboard SVG.', 'success');
+        return;
+    }
+
+    const canvas = await createDashboardExportCanvas();
+    canvas.toBlob(blob => {
+        if (!blob) {
+            showToast('Khong tao duoc PNG.', 'warn');
+            return;
+        }
+        downloadBlob(blob, `${fileName}.png`);
+        showToast('Da tai dashboard PNG.', 'success');
+    }, 'image/png', 0.95);
+}
+
+function downloadBlob(blob, filename) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `dashbot-dashboard-${format.toLowerCase()}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
+}
+
+function safeFileName(value) {
+    return String(value).replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'dashboard';
+}
+
+function escapeXml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+}
+
+function createDashboardSvg() {
+    const width = 1500;
+    const columns = 3;
+    const gap = 28;
+    const margin = 42;
+    const cardWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
+    const cardHeight = 285;
+    const headerHeight = 116;
+    const rows = Math.ceil(currentCharts.length / columns);
+    const height = headerHeight + margin + rows * cardHeight + Math.max(0, rows - 1) * gap;
+    const bg = isDark ? '#0b1120' : '#f8fafc';
+    const cardBg = isDark ? '#111827' : '#ffffff';
+    const text = isDark ? '#e2e8f0' : '#1e293b';
+    const muted = isDark ? '#94a3b8' : '#64748b';
+    const border = isDark ? '#263244' : '#e2e8f0';
+    const title = document.getElementById('canvasTitle')?.textContent || `Insights about ${currentDatasetName || 'dashboard'}`;
+    const subtitle = document.getElementById('canvasSubtitle')?.textContent || 'Generated by DashBot.';
+    const chartBlocks = currentCharts.map((chart, i) => {
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        const x = margin + col * (cardWidth + gap);
+        const y = headerHeight + row * (cardHeight + gap);
+        const canvas = document.getElementById(`chart${i}`);
+        const dataUrl = canvas ? canvas.toDataURL('image/png') : '';
+        return `
+            <g>
+                <rect x="${x}" y="${y}" width="${cardWidth}" height="${cardHeight}" rx="14" fill="${cardBg}" stroke="${border}"/>
+                <text x="${x + 22}" y="${y + 34}" font-size="17" font-weight="700" fill="${text}">${escapeXml(chart.title || chartTitle(chart))}</text>
+                <text x="${x + cardWidth - 110}" y="${y + 34}" font-size="12" font-weight="700" fill="#ef4444">${escapeXml(chart.insight_type || inferInsightLabel(chart))}</text>
+                <image x="${x + 22}" y="${y + 58}" width="${cardWidth - 44}" height="${cardHeight - 82}" href="${dataUrl}" preserveAspectRatio="xMidYMid meet"/>
+            </g>
+        `;
+    }).join('');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="100%" height="100%" fill="${bg}"/>
+    <text x="${margin}" y="54" font-size="34" font-weight="800" fill="${text}">${escapeXml(title)}</text>
+    <text x="${margin}" y="88" font-size="17" fill="${muted}">${escapeXml(subtitle)}</text>
+    ${chartBlocks}
+</svg>`;
+}
+
+async function createDashboardExportCanvas() {
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const width = 1500;
+    const columns = 3;
+    const gap = 28;
+    const margin = 42;
+    const cardWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
+    const cardHeight = 285;
+    const headerHeight = 116;
+    const rows = Math.ceil(currentCharts.length / columns);
+    const height = headerHeight + margin + rows * cardHeight + Math.max(0, rows - 1) * gap;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const bg = isDark ? '#0b1120' : '#f8fafc';
+    const cardBg = isDark ? '#111827' : '#ffffff';
+    const text = isDark ? '#e2e8f0' : '#1e293b';
+    const muted = isDark ? '#94a3b8' : '#64748b';
+    const border = isDark ? '#263244' : '#e2e8f0';
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = text;
+    ctx.font = '800 34px Inter, Arial, sans-serif';
+    ctx.fillText(document.getElementById('canvasTitle')?.textContent || `Insights about ${currentDatasetName || 'dashboard'}`, margin, 54);
+    ctx.fillStyle = muted;
+    ctx.font = '17px Inter, Arial, sans-serif';
+    ctx.fillText(document.getElementById('canvasSubtitle')?.textContent || 'Generated by DashBot.', margin, 88);
+
+    currentCharts.forEach((chart, i) => {
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        const x = margin + col * (cardWidth + gap);
+        const y = headerHeight + row * (cardHeight + gap);
+        drawRoundRect(ctx, x, y, cardWidth, cardHeight, 14, cardBg, border);
+        ctx.fillStyle = text;
+        ctx.font = '700 17px Inter, Arial, sans-serif';
+        drawClippedText(ctx, chart.title || chartTitle(chart), x + 22, y + 34, cardWidth - 150);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '700 12px Inter, Arial, sans-serif';
+        ctx.fillText(chart.insight_type || inferInsightLabel(chart), x + cardWidth - 110, y + 34);
+        const source = document.getElementById(`chart${i}`);
+        if (source) ctx.drawImage(source, x + 22, y + 58, cardWidth - 44, cardHeight - 82);
+    });
+    return canvas;
+}
+
+function drawRoundRect(ctx, x, y, width, height, radius, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
+function drawClippedText(ctx, value, x, y, maxWidth) {
+    let text = String(value);
+    while (ctx.measureText(text).width > maxWidth && text.length > 4) {
+        text = `${text.slice(0, -4)}...`;
+    }
+    ctx.fillText(text, x, y);
 }
 
 function toggleExportMenu() { document.getElementById('exportMenu').classList.toggle('show'); }
@@ -689,4 +955,32 @@ document.addEventListener('DOMContentLoaded', () => {
     setEmptyState();
     document.getElementById('uploadModal').classList.remove('open');
     document.getElementById('previewModal').classList.remove('open');
+
+    // Sidebar divider drag-to-resize setup
+    const resizer = document.getElementById('sidebar-resizer');
+    const topicSection = document.getElementById('topicListSection');
+    if (resizer && topicSection) {
+        let isDragging = false;
+        resizer.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const sidebar = topicSection.parentElement;
+            const sidebarRect = sidebar.getBoundingClientRect();
+            const newHeight = e.clientY - sidebarRect.top;
+            // Clamp height between 150px and sidebar_height - 180px
+            const clampedHeight = Math.max(150, Math.min(newHeight, sidebarRect.height - 180));
+            topicSection.style.height = `${clampedHeight}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+    }
 });
