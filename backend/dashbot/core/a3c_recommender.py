@@ -68,7 +68,7 @@ class A3CDashboardRecommender:
         state = env.reset()
         best_state = state.copy()
         best_reward = self._dashboard_reward(frame, env, best_state.charts)
-        seen_charts: dict[tuple[str, str, str | None, str | None, str | None], ChartSpec] = {}
+        seen_charts: dict[tuple[str, str, str | None, str | None, str | None, str | None], ChartSpec] = {}
         steps_used = 0
         report_interval = max(1, self.search_steps // 100)
         self._report_progress(steps_used, "Running A3C rollout")
@@ -112,6 +112,12 @@ class A3CDashboardRecommender:
         recommendations = self._recommendation_charts(frame, env, selected, seen_charts)
         final_reward = self._dashboard_reward(frame, env, selected)
         insights = self.insight_detector.detect_dashboard(frame, env.profile, selected)
+        topic_builder = GreedyDashboardRecommender(
+            profiler=self.profiler,
+            reward_engine=self.reward_engine,
+            chart_generator=self.chart_generator,
+            max_charts=self.max_charts,
+        )
         return {
             "method": "a3c",
             "model_loaded": self.model_loaded,
@@ -121,6 +127,7 @@ class A3CDashboardRecommender:
             "profile": env.profile.to_dict(),
             "charts": [self._chart_response(chart, env) for chart in selected],
             "recommendations": [self._chart_response(chart, env) for chart in recommendations],
+            "topics": topic_builder._topic_dashboards(frame, env.profile, selected, recommendations),
             "insights": [insight.to_dict() for insight in insights],
         }
 
@@ -140,7 +147,7 @@ class A3CDashboardRecommender:
         frame: pd.DataFrame,
         env: DashboardEnv,
         selected: list[ChartSpec],
-        seen_charts: dict[tuple[str, str, str | None, str | None, str | None], ChartSpec],
+        seen_charts: dict[tuple[str, str, str | None, str | None, str | None, str | None], ChartSpec],
     ) -> list[ChartSpec]:
         used = {self._chart_signature(chart) for chart in selected}
         candidates = [chart for signature, chart in seen_charts.items() if signature not in used]
@@ -181,8 +188,12 @@ class A3CDashboardRecommender:
         remaining = list(pool)
         while len(rebuilt) < self.max_charts and remaining:
             used_marks = {chart.mark for chart in rebuilt}
+            viable = [
+                chart for chart in remaining
+                if self._analysis_signature(chart) not in {self._analysis_signature(existing) for existing in rebuilt}
+            ] or remaining
             best_chart = max(
-                remaining,
+                viable,
                 key=lambda chart: self._candidate_score(frame, env, rebuilt, chart, used_marks),
             )
             rebuilt.append(best_chart)
@@ -199,27 +210,35 @@ class A3CDashboardRecommender:
     ) -> float:
         reward = self._dashboard_reward(frame, env, selected + [chart])
         type_bonus = 0.75 if chart.mark not in used_marks else 0.0
+        field_bonus = 0.06 * len(set(chart.fields()) - {field for existing in selected for field in existing.fields()})
+        repeated_x_penalty = 0.45 if any(existing.x == chart.x for existing in selected) else 0.0
         insight_bonus = 0.08 * len(self.insight_detector.detect_for_chart(frame, env.profile, chart))
-        return reward + type_bonus + insight_bonus
+        return reward + type_bonus + field_bonus + insight_bonus - repeated_x_penalty
 
     def _recommendation_charts(
         self,
         frame: pd.DataFrame,
         env: DashboardEnv,
         selected: list[ChartSpec],
-        seen_charts: dict[tuple[str, str, str | None, str | None, str | None], ChartSpec],
+        seen_charts: dict[tuple[str, str, str | None, str | None, str | None, str | None], ChartSpec],
         limit: int = 4,
     ) -> list[ChartSpec]:
         used = {self._chart_signature(chart) for chart in selected}
+        used_analysis = {self._analysis_signature(chart) for chart in selected}
         selected_marks = {chart.mark for chart in selected}
         selected_fields = {field for chart in selected for field in chart.fields()}
         pool = self._dedupe_charts(list(seen_charts.values()) + GreedyDashboardRecommender._candidate_charts(env.profile))
-        candidates = [chart for chart in pool if self._chart_signature(chart) not in used]
+        candidates = [
+            chart
+            for chart in pool
+            if self._chart_signature(chart) not in used
+            and self._analysis_signature(chart) not in used_analysis
+        ]
         candidates.sort(
             key=lambda chart: self._recommendation_score(frame, env, selected, chart, selected_marks, selected_fields),
             reverse=True,
         )
-        return candidates[:limit]
+        return self._take_diverse_recommendations(candidates, limit)
 
     def _recommendation_score(
         self,
@@ -233,8 +252,9 @@ class A3CDashboardRecommender:
         reward = self._dashboard_reward(frame, env, selected + [chart])
         type_bonus = 0.4 if chart.mark not in selected_marks else 0.0
         field_bonus = 0.05 * len(set(chart.fields()) - selected_fields)
+        repeated_x_penalty = 0.35 if any(existing.x == chart.x for existing in selected) else 0.0
         insight_bonus = 0.08 * len(self.insight_detector.detect_for_chart(frame, env.profile, chart))
-        return reward + type_bonus + field_bonus + insight_bonus
+        return reward + type_bonus + field_bonus + insight_bonus - repeated_x_penalty
 
     def _chart_response(self, chart: ChartSpec, env: DashboardEnv) -> dict:
         return {
@@ -242,23 +262,60 @@ class A3CDashboardRecommender:
             "vega_lite": self.chart_generator.to_vega_lite(chart, profile=env.profile),
         }
 
-    def _dedupe_charts(self, charts: list[ChartSpec]) -> list[ChartSpec]:
+    @staticmethod
+    def _take_diverse_recommendations(candidates: list[ChartSpec], limit: int) -> list[ChartSpec]:
         selected: list[ChartSpec] = []
         used = set()
-        for chart in charts:
-            signature = self._chart_signature(chart)
+        for mark in ["bar", "line", "boxplot", "point"]:
+            chart = next((candidate for candidate in candidates if candidate.mark == mark and candidate not in selected), None)
+            if chart is None:
+                continue
+            selected.append(chart)
+            used.add(A3CDashboardRecommender._analysis_signature(chart))
+            if len(selected) >= limit:
+                return selected
+        for chart in candidates:
+            signature = A3CDashboardRecommender._analysis_signature(chart)
             if signature in used:
                 continue
             selected.append(chart)
             used.add(signature)
+            if len(selected) >= limit:
+                break
+        return selected
+
+    def _dedupe_charts(self, charts: list[ChartSpec]) -> list[ChartSpec]:
+        selected: list[ChartSpec] = []
+        used_exact = set()
+        used_analysis = set()
+        for chart in charts:
+            exact = self._chart_signature(chart)
+            analysis = self._analysis_signature(chart)
+            if exact in used_exact or analysis in used_analysis:
+                continue
+            selected.append(chart)
+            used_exact.add(exact)
+            used_analysis.add(analysis)
         return selected
 
     @staticmethod
-    def _chart_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None, str | None]:
+    def _chart_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None, str | None, str | None]:
         return (
             chart.mark,
             chart.x,
             chart.y,
+            chart.color,
             chart.x_agg,
             chart.y_agg,
         )
+
+    @staticmethod
+    def _analysis_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None]:
+        if chart.mark == "point" and chart.y:
+            x, y = sorted([chart.x, chart.y])
+            return ("relationship", x, y, chart.color)
+        if chart.mark == "line":
+            return ("trend", chart.x, chart.y, chart.color)
+        if chart.mark == "bar" and chart.x_agg == "bin":
+            return ("distribution", chart.x, None, None)
+        return ("grouped", chart.mark, chart.x, chart.y or chart.color)

@@ -53,6 +53,7 @@ class GreedyDashboardRecommender:
             "profile": profile.to_dict(),
             "charts": [self._chart_response(chart, profile) for chart in selected],
             "recommendations": [self._chart_response(chart, profile) for chart in recommendations],
+            "topics": self._topic_dashboards(frame, profile, selected, recommendations),
             "insights": [insight.to_dict() for insight in insights],
         }
 
@@ -103,14 +104,20 @@ class GreedyDashboardRecommender:
         limit: int = 4,
     ) -> list[ChartSpec]:
         used = {self._chart_signature(chart) for chart in selected}
+        used_analysis = {self._analysis_signature(chart) for chart in selected}
         selected_marks = {chart.mark for chart in selected}
         selected_fields = {field for chart in selected for field in chart.fields()}
-        unique_candidates = self._dedupe_charts(chart for chart in candidates if self._chart_signature(chart) not in used)
+        unique_candidates = self._dedupe_charts(
+            chart
+            for chart in candidates
+            if self._chart_signature(chart) not in used
+            and self._analysis_signature(chart) not in used_analysis
+        )
         unique_candidates.sort(
             key=lambda chart: self._candidate_score(frame, profile, selected, chart, selected_marks, selected_fields),
             reverse=True,
         )
-        return unique_candidates[:limit]
+        return self._take_diverse_recommendations(unique_candidates, limit)
 
     def _candidate_score(
         self,
@@ -124,8 +131,9 @@ class GreedyDashboardRecommender:
         reward = self.reward_engine.dashboard_reward(frame, profile, selected + [chart])
         type_bonus = 0.4 if chart.mark not in selected_marks else 0.0
         field_bonus = 0.05 * len(set(chart.fields()) - selected_fields)
+        repeated_x_penalty = 0.35 if any(existing.x == chart.x for existing in selected) else 0.0
         insight_bonus = 0.08 * len(InsightDetector().detect_for_chart(frame, profile, chart))
-        return reward + type_bonus + field_bonus + insight_bonus
+        return reward + type_bonus + field_bonus + insight_bonus - repeated_x_penalty
 
     def _chart_response(self, chart: ChartSpec, profile: DatasetProfile) -> dict:
         return {
@@ -133,24 +141,190 @@ class GreedyDashboardRecommender:
             "vega_lite": self.chart_generator.to_vega_lite(chart, profile=profile),
         }
 
+    def _topic_dashboards(
+        self,
+        frame: pd.DataFrame,
+        profile: DatasetProfile,
+        overview_charts: list[ChartSpec],
+        overview_recommendations: list[ChartSpec],
+        limit: int = 8,
+    ) -> list[dict]:
+        pool = self._dedupe_charts(overview_charts + overview_recommendations + self._candidate_charts(profile))
+        overview_reward = self.reward_engine.dashboard_reward(frame, profile, overview_charts)
+        topics: list[dict] = [
+            self._topic_response(
+                key_column=None,
+                title="Overview dashboard",
+                reward=overview_reward,
+                charts=overview_charts,
+                recommendations=overview_recommendations,
+                profile=profile,
+                frame=frame,
+                active=True,
+            )
+        ]
+
+        topic_candidates = []
+        for column in profile.modeled_columns():
+            related = [chart for chart in pool if column.name in chart.fields()]
+            if not related:
+                continue
+            charts = self._select_topic_charts(frame, profile, related, column.name)
+            if not charts:
+                continue
+            recommendations = self._select_topic_recommendations(frame, profile, pool, charts, column.name)
+            reward = self.reward_engine.dashboard_reward(frame, profile, charts)
+            topic_candidates.append(
+                self._topic_response(
+                    key_column=column.name,
+                    title=f"Insights about {column.name}",
+                    reward=reward,
+                    charts=charts,
+                    recommendations=recommendations,
+                    profile=profile,
+                    frame=frame,
+                )
+            )
+
+        topic_candidates.sort(key=lambda topic: topic["reward"], reverse=True)
+        topics.extend(topic_candidates[: max(0, limit - 1)])
+        return topics
+
+    def _select_topic_charts(
+        self,
+        frame: pd.DataFrame,
+        profile: DatasetProfile,
+        candidates: list[ChartSpec],
+        key_column: str,
+    ) -> list[ChartSpec]:
+        selected: list[ChartSpec] = []
+        remaining = self._dedupe_charts(candidates)
+        while remaining and len(selected) < self.max_charts:
+            used_marks = {chart.mark for chart in selected}
+            best = max(
+                remaining,
+                key=lambda chart: self._topic_chart_score(frame, profile, selected, chart, key_column, used_marks),
+            )
+            selected.append(best)
+            remaining.remove(best)
+        return selected
+
+    def _select_topic_recommendations(
+        self,
+        frame: pd.DataFrame,
+        profile: DatasetProfile,
+        pool: list[ChartSpec],
+        selected: list[ChartSpec],
+        key_column: str,
+        limit: int = 4,
+    ) -> list[ChartSpec]:
+        selected_exact = {self._chart_signature(chart) for chart in selected}
+        selected_analysis = {self._analysis_signature(chart) for chart in selected}
+        candidates = [
+            chart
+            for chart in pool
+            if key_column in chart.fields()
+            and self._chart_signature(chart) not in selected_exact
+            and self._analysis_signature(chart) not in selected_analysis
+        ]
+        candidates.sort(
+            key=lambda chart: self._topic_chart_score(frame, profile, selected, chart, key_column, {c.mark for c in selected}),
+            reverse=True,
+        )
+        return self._take_diverse_recommendations(candidates, limit)
+
+    def _topic_chart_score(
+        self,
+        frame: pd.DataFrame,
+        profile: DatasetProfile,
+        selected: list[ChartSpec],
+        chart: ChartSpec,
+        key_column: str,
+        used_marks: set[str],
+    ) -> float:
+        reward = self.reward_engine.dashboard_reward(frame, profile, selected + [chart])
+        key_bonus = 0.5 if chart.x == key_column else 0.3 if chart.y == key_column else 0.15
+        type_bonus = 0.35 if chart.mark not in used_marks else 0.0
+        insight_bonus = 0.08 * len(InsightDetector().detect_for_chart(frame, profile, chart))
+        return reward + key_bonus + type_bonus + insight_bonus
+
+    def _topic_response(
+        self,
+        key_column: str | None,
+        title: str,
+        reward: float,
+        charts: list[ChartSpec],
+        recommendations: list[ChartSpec],
+        profile: DatasetProfile,
+        frame: pd.DataFrame,
+        active: bool = False,
+    ) -> dict:
+        insights = InsightDetector().detect_dashboard(frame, profile, charts)
+        return {
+            "key_column": key_column,
+            "title": title,
+            "reward": reward,
+            "charts": [self._chart_response(chart, profile) for chart in charts],
+            "recommendations": [self._chart_response(chart, profile) for chart in recommendations],
+            "insights": [insight.to_dict() for insight in insights],
+            "active": active,
+        }
+
     @classmethod
-    def _dedupe_charts(cls, charts: Iterable[ChartSpec]) -> list[ChartSpec]:
+    def _take_diverse_recommendations(cls, candidates: list[ChartSpec], limit: int) -> list[ChartSpec]:
         selected: list[ChartSpec] = []
         used = set()
-        for chart in charts:
-            signature = cls._chart_signature(chart)
+        for mark in ["bar", "line", "boxplot", "point"]:
+            chart = next((candidate for candidate in candidates if candidate.mark == mark and candidate not in selected), None)
+            if chart is None:
+                continue
+            selected.append(chart)
+            used.add(cls._analysis_signature(chart))
+            if len(selected) >= limit:
+                return selected
+        for chart in candidates:
+            signature = cls._analysis_signature(chart)
             if signature in used:
                 continue
             selected.append(chart)
             used.add(signature)
+            if len(selected) >= limit:
+                break
+        return selected
+
+    @classmethod
+    def _dedupe_charts(cls, charts: Iterable[ChartSpec]) -> list[ChartSpec]:
+        selected: list[ChartSpec] = []
+        used_exact = set()
+        used_analysis = set()
+        for chart in charts:
+            exact = cls._chart_signature(chart)
+            analysis = cls._analysis_signature(chart)
+            if exact in used_exact or analysis in used_analysis:
+                continue
+            selected.append(chart)
+            used_exact.add(exact)
+            used_analysis.add(analysis)
         return selected
 
     @staticmethod
-    def _chart_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None, str | None]:
+    def _chart_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None, str | None, str | None]:
         return (
             chart.mark,
             chart.x,
             chart.y,
+            chart.color,
             chart.x_agg,
             chart.y_agg,
         )
+
+    @staticmethod
+    def _analysis_signature(chart: ChartSpec) -> tuple[str, str, str | None, str | None]:
+        if chart.mark == "point" and chart.y:
+            x, y = sorted([chart.x, chart.y])
+            return ("relationship", x, y, chart.color)
+        if chart.mark == "line":
+            return ("trend", chart.x, chart.y, chart.color)
+        if chart.mark == "bar" and chart.x_agg == "bin":
+            return ("distribution", chart.x, None, None)
+        return ("grouped", chart.mark, chart.x, chart.y or chart.color)

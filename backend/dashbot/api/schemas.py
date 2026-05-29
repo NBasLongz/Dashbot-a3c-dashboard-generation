@@ -27,6 +27,7 @@ class RecommendationResponse(BaseModel):
     profile: dict[str, Any]
     charts: list[ChartResponse]
     recommendations: list[ChartResponse] = Field(default_factory=list)
+    topics: list[dict[str, Any]] = Field(default_factory=list)
     insights: list[dict[str, Any]]
 
 
