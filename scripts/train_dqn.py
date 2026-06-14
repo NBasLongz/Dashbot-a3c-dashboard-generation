@@ -183,11 +183,14 @@ def main() -> None:
     if not csv_paths:
         raise SystemExit(f"No CSV files found in {args.data_dir}")
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     feature_encoder = StateFeatureEncoder(FeatureEncoderConfig(max_columns=10, max_charts=8))
     action_space = DQNActionSpace(max_columns=10, max_charts=8)
     config = NetworkConfig(feature_size=feature_encoder.feature_size, hidden_size=args.hidden_size, max_columns=10, max_charts=8)
-    model = DashBotQNetwork(config, action_space.action_count)
-    target_model = DashBotQNetwork(config, action_space.action_count)
+    model = DashBotQNetwork(config, action_space.action_count).to(device)
+    target_model = DashBotQNetwork(config, action_space.action_count).to(device)
     target_model.load_state_dict(model.state_dict())
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     replay = ReplayBuffer(args.replay_size)
@@ -215,7 +218,7 @@ def main() -> None:
         episode_return += reward
 
         if len(replay) >= args.batch_size:
-            latest_loss = update_dqn(model, target_model, optimizer, replay, args.batch_size, args.gamma)
+            latest_loss = update_dqn(model, target_model, optimizer, replay, args.batch_size, args.gamma, device)
 
         if step % args.target_update_interval == 0:
             target_model.load_state_dict(model.state_dict())
@@ -248,8 +251,9 @@ def choose_action(model: DashBotQNetwork, state_tensor: torch.Tensor, mask: torc
     if random.random() < epsilon:
         return int(valid_indices[random.randrange(len(valid_indices))].item())
     with torch.no_grad():
-        q_values = model(state_tensor.unsqueeze(0)).squeeze(0)
-        q_values = q_values.masked_fill(~mask, -1e9)
+        device = next(model.parameters()).device
+        q_values = model(state_tensor.unsqueeze(0).to(device)).squeeze(0)
+        q_values = q_values.masked_fill(~mask.to(device), -1e9)
         return int(torch.argmax(q_values).item())
 
 
@@ -260,14 +264,15 @@ def update_dqn(
     replay: ReplayBuffer,
     batch_size: int,
     gamma: float,
+    device: torch.device,
 ) -> float:
     batch = replay.sample(batch_size)
-    states = torch.stack([transition.state for transition in batch])
-    actions = torch.tensor([transition.action_index for transition in batch], dtype=torch.long).unsqueeze(1)
-    rewards = torch.tensor([transition.reward for transition in batch], dtype=torch.float32)
-    next_states = torch.stack([transition.next_state for transition in batch])
-    next_masks = torch.stack([transition.next_mask for transition in batch])
-    dones = torch.tensor([transition.done for transition in batch], dtype=torch.float32)
+    states = torch.stack([transition.state for transition in batch]).to(device)
+    actions = torch.tensor([transition.action_index for transition in batch], dtype=torch.long).unsqueeze(1).to(device)
+    rewards = torch.tensor([transition.reward for transition in batch], dtype=torch.float32).to(device)
+    next_states = torch.stack([transition.next_state for transition in batch]).to(device)
+    next_masks = torch.stack([transition.next_mask for transition in batch]).to(device)
+    dones = torch.tensor([transition.done for transition in batch], dtype=torch.float32).to(device)
 
     q_values = model(states).gather(1, actions).squeeze(1)
     with torch.no_grad():
