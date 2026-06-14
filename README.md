@@ -1,270 +1,90 @@
-# DashBot Reimplementation
+# DashBot: Insight-Driven Dashboard Generation
 
-DashBot reproduction theo paper **"DashBot: Insight-Driven Dashboard Generation Based on Deep Reinforcement Learning"**.
+Dự án tái hiện nghiên cứu **DashBot** dựa trên bài báo khoa học **"DashBot: Insight-Driven Dashboard Generation Based on Deep Reinforcement Learning"**.
 
-Project nay tach hai muc tieu:
+Dự án này tích hợp hai mục tiêu chính:
+1. **Nghiên cứu đối chứng (Ablation Study)**: Tái lập môi trường MDP (DashboardEnv), bộ tính toán phần thưởng (Reward Engine), cơ chế tạo mặt nạ ràng buộc (Constrained Sampling), thuật toán A3C và DQN để đo lường hiệu năng.
+2. **Hệ thống Demo Web (FastAPI & HTML/JS)**: Giao diện trực quan cho phép người dùng tải lên tệp CSV và hiển thị các biểu đồ gợi ý thời gian thực bằng mô hình DashBot đã huấn luyện.
 
-- **Research reproduction**: MDP environment, reward engine, constrained sampling, A3C actor-critic, rollout training.
-- **Product demo**: FastAPI backend va frontend HTML/CSS/JS tach file, realtime A3C dashboard recommendation tu CSV upload.
+---
 
-## Structure
+## 1. Cấu trúc thư mục dự án
 
 ```text
 backend/dashbot/
-  api/        FastAPI endpoints
-  core/       data profiler, insight detector, chart generator, A3C/greedy recommenders
-  rl_env/     DashboardEnv, rewards, constrained sampling
-  agent/      PyTorch Bi-LSTM actor-critic va trainer shell
+  api/        - Các API FastAPI endpoint (health, profile, recommend)
+  core/       - Xử lý dữ liệu (Profiler, Insight Detector, Chart Generator, Recommenders)
+  rl_env/     - Môi trường RL (DashboardEnv, Reward Engine, Constraints)
+  agent/      - Mô hình mạng mạng học máy Bi-LSTM Actor-Critic và Policy Sampler
 frontend/
-  index.html
-  css/styles.css
-  js/app.js
-  js/api.js
-configs/default.yaml
-scripts/prepare_data.py
-scripts/evaluate.py
-scripts/train.py
-tests/
+  index.html  - Giao diện web người dùng tải CSV và xem biểu đồ gợi ý
+  css/        - Stylesheet giao diện
+  js/         - Xử lý gọi API và vẽ biểu đồ Vega-Lite
+configs/      - Cấu hình huấn luyện mặc định (YAML)
+reports/      - Logs huấn luyện (CSV) và các biểu đồ so sánh mô hình (Fig 6)
+scripts/      - Các script chuẩn bị dữ liệu, huấn luyện (A3C, DQN) và đánh giá mô hình
+tests/        - Bộ unit test kiểm thử môi trường và logic cốt lõi
 ```
 
-## Paper Assumptions
+---
 
-| Component | Value |
-|---|---|
-| `alpha` | `3.0` |
-| `n_best` | `4` |
-| `n_max` | `8` |
-| correlation threshold | `0.5` |
-| top/bottom k | `5` |
-| optimizer | Adam |
-| learning rate | `1e-4` |
-| Bi-LSTM hidden size | `128` per direction |
-| entropy coefficient | `0.01` |
-| value loss coefficient | `0.5` |
-| gamma | `1.0` |
-| max columns | `10` |
-| max episode steps | `50` |
-| training steps | `500000` |
+## 2. Hướng dẫn cài đặt nhanh
 
-## Setup
-
-Install dependencies:
-
+### Bước 1: Cài đặt thư viện phụ thuộc
+Cài đặt các thư viện cần thiết thông qua tệp `requirements.txt`:
 ```bash
 pip install -r requirements.txt
 ```
 
-Set `PYTHONPATH` before running backend scripts.
+### Bước 2: Thiết lập biến môi trường `PYTHONPATH`
+Để chạy các script trong thư mục `scripts/` hoặc khởi chạy API backend, bạn cần thêm thư mục `backend` vào biến môi trường:
 
-Windows PowerShell:
+* **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH='backend'
+  ```
+* **macOS / Linux**:
+  ```bash
+  export PYTHONPATH=backend
+  ```
+* **Windows CMD**:
+  ```cmd
+  set PYTHONPATH=backend
+  ```
 
-```powershell
-$env:PYTHONPATH='backend'
-```
+---
 
-macOS/Linux terminal:
+## 3. Khởi chạy hệ thống Demo
 
+### Bước 1: Chạy FastAPI Backend API
+Sau khi thiết lập `PYTHONPATH`, chạy lệnh sau để bật server backend:
 ```bash
-export PYTHONPATH=backend
+python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
 ```
 
-Windows CMD:
+### Bước 2: Mở giao diện Frontend
+* Chỉ cần mở tệp `frontend/index.html` bằng bất kỳ trình duyệt web nào.
+* Bạn có thể tải lên các tệp dữ liệu CSV mẫu từ thư mục `data/processed/` (ví dụ `cars.csv`, `movies.csv`, `penguins.csv`) để kiểm nghiệm tính năng gợi ý dashboard tự động thời gian thực.
 
-```bat
-set PYTHONPATH=backend
-```
+---
 
-## Run Tests
+## 4. Chạy kiểm thử & Vẽ lại đồ thị đối chứng (Ablation Study)
 
-After setting `PYTHONPATH`:
-
+### Chạy Unit Test
+Để xác nhận tính đúng đắn của môi trường và các hàm tính toán phần thưởng:
 ```bash
 python -m pytest -q
 ```
 
-## Evaluate Greedy Baseline
-
+### Đánh giá hiệu suất mô hình thực tế
+Bạn có thể đánh giá điểm chất lượng reward trung bình của mô hình trên các tập dữ liệu mẫu:
 ```bash
 python scripts/evaluate.py data/processed/cars.csv
 ```
 
-## Run Backend API
-
-After setting `PYTHONPATH`:
-
-```bash
-python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
-```
-
-Backend URL:
-
-```text
-http://127.0.0.1:8010
-```
-
-Health check:
-
-```text
-http://127.0.0.1:8010/api/health
-```
-
-Recommendation API defaults to A3C inference:
-
-```text
-POST http://127.0.0.1:8010/api/recommend?max_charts=5&mode=a3c&search_steps=1000
-```
-
-Use `mode=greedy` only as a baseline comparison for the report.
-
-## Run Frontend
-
-Open this file in a browser:
-
-```text
-frontend/index.html
-```
-
-Then upload a CSV file. Recommended demo files:
-
-- `data/processed/cars.csv`
-- `data/processed/movies.csv`
-- `data/processed/seattle-weather.csv`
-- `data/processed/penguins.csv`
-
-The frontend calls:
-
-```text
-POST http://127.0.0.1:8010/api/recommend?max_charts=5&mode=a3c&search_steps=1000
-```
-
-## Current Implementation Status
-
-Done:
-
-- Data profiler: Q/N/T inference, cardinality, entropy, Gini, numeric stats.
-- Insight detector: distribution, trend, correlation, top/bottom k, co-correlation, comparison.
-- Reward engine: diversity, parsimony, insight reward, reward delta.
-- Dashboard environment: `reset`, `step`, `change/add/remove/terminate`.
-- Constrained sampling masks.
-- Greedy baseline recommender for comparison.
-- Realtime A3C recommender: feature tensor, actor-critic policy, constrained sampling, env rollout, best-dashboard selection.
-- FastAPI profile/recommend endpoints.
-- PyTorch Bi-LSTM actor-critic.
-- State feature encoder: `DashboardState -> torch.Tensor[max_charts, feature_size]`.
-- Policy sampler with constrained action/parameter sampling.
-- Actor-critic training loop in `scripts/train.py`.
-- Asynchronous A3C training loop in `scripts/train_a3c.py`.
-- Paper ablation baselines: `DashBot-ind.`, `DashBot-pen.`, and DQN training logs.
-- Demo checkpoint at `backend/dashbot/weights/dashbot_actor_critic.pth`.
-
-Next research step:
-
-- validate training quality on all 27 Vega datasets;
-- run multiple seeds for paper-style mean/std ablation curves;
-- tune constraints and reward constants based on generated dashboards.
-
-## Train Agent
-
-Prepare cleaned data first:
-
-```bash
-python scripts/prepare_data.py
-```
-
-Install PyTorch first, then run:
-
-```bash
-python scripts/train.py --steps 500000
-```
-
-By default, training uses the 27-file Vega manifest:
-
-```text
-data/processed/vega_27_manifest.txt
-```
-
-For a smoke test:
-
-```bash
-python scripts/train.py --steps 20 --rollout-length 5
-```
-
-For the current demo checkpoint:
-
-```bash
-python scripts/train.py --steps 200 --rollout-length 20 --save-path backend/dashbot/weights/dashbot_actor_critic.pth
-```
-
-## Paper Ablation Study
-
-Use these commands to reproduce the Fig. 6-style learning curves. Each command writes a separate CSV log and checkpoint, so the models are not mixed.
-
-Full DashBot A3C:
-
-```bash
-python scripts/train_a3c.py --variant dashbot --steps 500000 --workers 4 --rollout-length 50 --learning-rate 1e-4 --entropy-coef 0.01 --hidden-size 128 --log-interval 5000 --log-csv reports/ablation/training_curve_dashbot.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dashbot --save-path backend/dashbot/weights/ablation/dashbot_actor_critic.pth
-```
-
-DashBot-ind. without sequential prediction blocks:
-
-```bash
-python scripts/train_a3c.py --variant dashbot-ind --steps 500000 --workers 4 --rollout-length 50 --learning-rate 1e-4 --entropy-coef 0.01 --hidden-size 128 --log-interval 5000 --log-csv reports/ablation/training_curve_dashbot_ind.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dashbot_ind --save-path backend/dashbot/weights/ablation/dashbot_ind_actor_critic.pth
-```
-
-DashBot-pen. without constrained sampling, using penalties for invalid choices:
-
-```bash
-python scripts/train_a3c.py --variant dashbot-pen --steps 500000 --workers 4 --rollout-length 50 --learning-rate 1e-4 --entropy-coef 0.01 --hidden-size 128 --invalid-penalty -1.0 --log-interval 5000 --log-csv reports/ablation/training_curve_dashbot_pen.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dashbot_pen --save-path backend/dashbot/weights/ablation/dashbot_pen_actor_critic.pth
-```
-
-DQN baseline:
-
-```bash
-python scripts/train_dqn.py --steps 500000 --learning-rate 1e-4 --hidden-size 128 --batch-size 64 --target-update-interval 5000 --log-interval 5000 --log-csv reports/ablation/training_curve_dqn.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dqn --save-path backend/dashbot/weights/ablation/dashbot_dqn.pth
-```
-
-Plot all four curves:
-
+### Vẽ lại biểu đồ so sánh 4 mô hình (Fig. 6)
+Để vẽ lại đường cong học tập học máy so sánh giữa 4 mô hình (`DashBot`, `DashBot-ind.`, `DashBot-pen.`, và `DQN`), chạy script sau:
 ```bash
 python scripts/plot_paper_figures.py learning-curve --dashbot-log reports/ablation/training_curve_dashbot.csv --dashbot-ind-log reports/ablation/training_curve_dashbot_ind.csv --dashbot-pen-log reports/ablation/training_curve_dashbot_pen.csv --dqn-log reports/ablation/training_curve_dqn.csv --output reports/fig6_ablation_learning_curve.png
 ```
-
-For paper-style repeated runs, run each model with different `--seed` values and different log filenames, then pass all logs with `--dashbot-logs`, `--dashbot-ind-logs`, `--dashbot-pen-logs`, and `--dqn-logs`. The plot script will draw the mean line and standard-deviation band across runs.
-
-For a quick smoke test, replace `--steps 500000` with `--steps 100` and `--checkpoint-interval 0`.
-
-## Demo Flow
-
-1. Start the API:
-
-```bash
-python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
-```
-
-2. Open `frontend/index.html` in a browser.
-3. Upload any clean tabular CSV. Recommended demo files:
-
-- `data/processed/cars.csv`
-- `data/processed/movies.csv`
-- `data/processed/seattle-weather.csv`
-- `data/processed/penguins.csv`
-
-The frontend sends the CSV to `POST /api/recommend?mode=a3c&search_steps=1000` on `http://127.0.0.1:8010`, then renders the returned dashboard charts. The backend response includes `method`, `model_loaded`, and `search_steps`; for the normal demo these should show `a3c`, `true`, and the search quota used.
-
-Quick Windows PowerShell demo commands:
-
-```powershell
-$env:PYTHONPATH='backend'
-python scripts/prepare_data.py
-python -m pytest -q
-python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
-```
-
-Quick macOS/Linux terminal demo commands:
-
-```bash
-export PYTHONPATH=backend
-python scripts/prepare_data.py
-python -m pytest -q
-python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
-```
+Đồ thị so sánh kết quả cuối cùng sẽ được lưu tại: `reports/fig6_ablation_learning_curve.png`.
