@@ -47,7 +47,9 @@ class DashboardEnv:
 
         valid_actions = self.constraints.action_mask(self.state.charts)
         if not valid_actions.get(action, False):
-            return self.state.copy(), -1.0, False, {"invalid": True, "reason": f"Action {action} is masked"}
+            self.steps += 1
+            done = self.steps >= self.max_steps or len(self.state.charts) >= self.constraints.max_charts
+            return self.state.copy(), -1.0, done, {"invalid": True, "reason": f"Action {action} is masked"}
 
         if action == "change":
             self._change_key_column(params.get("key_column"))
