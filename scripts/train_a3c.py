@@ -18,9 +18,10 @@ sys.path.insert(0, str(ROOT / "backend"))
 from dashbot.agent.a3c_worker import A3CConfig
 from dashbot.agent.feature_encoder import FeatureEncoderConfig, StateFeatureEncoder
 from dashbot.agent.memory import RolloutBuffer, Transition
-from dashbot.agent.networks import DashBotActorCritic, NetworkConfig
-from dashbot.agent.policy import PolicySampler
+from dashbot.agent.networks import DashBotActorCritic, DashBotIndependentActorCritic, NetworkConfig
+from dashbot.agent.policy import PenaltyPolicySampler, PolicySampler
 from dashbot.rl_env.dashboard_env import DashboardEnv
+from dashbot.rl_env.constraints import VALID_AGGREGATES
 from scripts.train import default_data_dir, default_manifest, selected_csv_paths
 
 
@@ -53,6 +54,8 @@ def main() -> None:
     parser.add_argument("--value-loss-coef", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--variant", choices=["dashbot", "dashbot-ind", "dashbot-pen"], default="dashbot")
+    parser.add_argument("--invalid-penalty", type=float, default=-1.0)
     parser.add_argument("--use-transformed-features", action="store_true")
     parser.add_argument("--log-interval", type=int, default=5000)
     parser.add_argument("--log-csv", type=Path, default=ROOT / "reports" / "training_curve_a3c.csv")
@@ -67,14 +70,7 @@ def main() -> None:
 
     torch.manual_seed(args.seed)
     feature_encoder = StateFeatureEncoder(FeatureEncoderConfig(max_columns=10, max_charts=8))
-    global_model = DashBotActorCritic(
-        NetworkConfig(
-            feature_size=feature_encoder.feature_size,
-            hidden_size=args.hidden_size,
-            max_columns=10,
-            max_charts=8,
-        )
-    )
+    global_model = build_actor_critic(args, feature_encoder.feature_size)
     global_model.share_memory()
     optimizer = SharedAdam(global_model.parameters(), lr=args.learning_rate)
     counter = mp.Value("i", 0)
@@ -110,16 +106,9 @@ def worker_main(
     random.seed(args.seed + worker_id)
     torch.manual_seed(args.seed + worker_id)
     feature_encoder = StateFeatureEncoder(FeatureEncoderConfig(max_columns=10, max_charts=8))
-    local_model = DashBotActorCritic(
-        NetworkConfig(
-            feature_size=feature_encoder.feature_size,
-            hidden_size=args.hidden_size,
-            max_columns=10,
-            max_charts=8,
-        )
-    )
+    local_model = build_actor_critic(args, feature_encoder.feature_size)
     local_model.load_state_dict(global_model.state_dict())
-    policy = PolicySampler()
+    policy = build_policy(args)
     buffer = RolloutBuffer()
     config = A3CConfig(
         gamma=args.gamma,
@@ -144,7 +133,16 @@ def worker_main(
         state_tensor = feature_encoder.encode(state, env.profile, shuffle_charts=True, frame=feature_frame).unsqueeze(0)
         outputs = local_model(state_tensor)
         decision = policy.sample(outputs, state, env.profile)
-        next_state, reward, done, _ = env.step(decision.action, decision.params)
+        next_state, reward, done, info = env.step(decision.action, decision.params)
+        if args.variant == "dashbot-pen":
+            reward += invalid_decision_penalty(
+                decision.action,
+                decision.params,
+                state,
+                env.profile,
+                info,
+                args.invalid_penalty,
+            )
         buffer.append(
             Transition(
                 state=state_tensor.detach(),
@@ -228,7 +226,77 @@ def update_global(
     }
 
 
-def ensure_shared_grads(local_model: DashBotActorCritic, global_model: DashBotActorCritic) -> None:
+def build_actor_critic(args: argparse.Namespace, feature_size: int) -> DashBotActorCritic | DashBotIndependentActorCritic:
+    config = NetworkConfig(
+        feature_size=feature_size,
+        hidden_size=args.hidden_size,
+        max_columns=10,
+        max_charts=8,
+    )
+    if args.variant == "dashbot-ind":
+        return DashBotIndependentActorCritic(config)
+    return DashBotActorCritic(config)
+
+
+def build_policy(args: argparse.Namespace) -> PolicySampler:
+    if args.variant == "dashbot-pen":
+        return PenaltyPolicySampler()
+    return PolicySampler()
+
+
+def invalid_decision_penalty(
+    action: str,
+    params: dict,
+    state,
+    profile,
+    info: dict,
+    penalty: float,
+) -> float:
+    if info.get("invalid"):
+        return penalty
+    if action == "change":
+        valid_names = {column.name for column in profile.modeled_columns()}
+        return 0.0 if params.get("key_column") in valid_names else penalty
+    if action == "remove":
+        index = int(params.get("index", -1))
+        return 0.0 if 0 <= index < len(state.charts) else penalty
+    if action == "add":
+        chart = params.get("chart")
+        return 0.0 if is_feasible_chart(chart, profile) else penalty
+    return 0.0
+
+
+def is_feasible_chart(chart, profile) -> bool:
+    if chart is None:
+        return False
+    by_name = profile.by_name()
+    x_profile = by_name.get(chart.x)
+    y_profile = by_name.get(chart.y) if chart.y else None
+    color_profile = by_name.get(chart.color) if chart.color else None
+    if x_profile is None:
+        return False
+    if chart.color and (color_profile is None or color_profile.type != "N" or chart.color in {chart.x, chart.y}):
+        return False
+    for field, aggregate in [(chart.x, chart.x_agg), (chart.y, chart.y_agg)]:
+        if not aggregate:
+            continue
+        field_profile = by_name.get(field or "")
+        if field_profile is None or aggregate not in VALID_AGGREGATES[field_profile.type]:
+            return False
+    if chart.mark == "line":
+        return y_profile is not None and x_profile.type == "T" and y_profile.type == "Q"
+    if chart.mark == "point":
+        return y_profile is not None and x_profile.type == "Q" and y_profile.type == "Q" and chart.x != chart.y
+    if chart.mark == "boxplot":
+        return y_profile is not None and x_profile.type == "N" and y_profile.type == "Q"
+    if chart.mark == "bar":
+        if x_profile.type == "Q":
+            return chart.x_agg == "bin" or y_profile is not None
+        return y_profile is None or y_profile.type == "Q"
+    return False
+
+
+def ensure_shared_grads(local_model, global_model) -> None:
     for local_param, global_param in zip(local_model.parameters(), global_model.parameters()):
         if global_param.grad is not None:
             continue
@@ -286,7 +354,7 @@ def append_log_csv(
 
 
 def maybe_save_periodic_checkpoint(
-    global_model: DashBotActorCritic,
+    global_model,
     args: argparse.Namespace,
     step: int,
     feature_size: int,
@@ -299,7 +367,7 @@ def maybe_save_periodic_checkpoint(
 
 def save_checkpoint(
     path: Path,
-    model: DashBotActorCritic,
+    model,
     args: argparse.Namespace,
     worker_count: int,
     step: int,
@@ -314,6 +382,7 @@ def save_checkpoint(
             "max_columns": 10,
             "max_charts": 8,
             "training": "a3c",
+            "variant": args.variant,
             "workers": worker_count,
             "steps": step,
         },

@@ -18,6 +18,10 @@ def main() -> None:
     curve.add_argument("--dashbot-ind-log", type=Path)
     curve.add_argument("--dashbot-pen-log", type=Path)
     curve.add_argument("--dqn-log", type=Path)
+    curve.add_argument("--dashbot-logs", nargs="*", type=Path)
+    curve.add_argument("--dashbot-ind-logs", nargs="*", type=Path)
+    curve.add_argument("--dashbot-pen-logs", nargs="*", type=Path)
+    curve.add_argument("--dqn-logs", nargs="*", type=Path)
     curve.add_argument("--output", type=Path, default=ROOT / "reports" / "fig6_learning_curve.png")
 
     study = subparsers.add_parser("user-study", help="Plot Fig. 8-style stacked user study votes.")
@@ -34,24 +38,26 @@ def main() -> None:
 
 def plot_learning_curve(args: argparse.Namespace) -> None:
     series = [
-        ("DashBot", args.dashbot_log, "#1f77b4"),
-        ("DashBot-ind.", args.dashbot_ind_log, "#ff7f0e"),
-        ("DashBot-pen.", args.dashbot_pen_log, "#2ca02c"),
-        ("DQN", args.dqn_log, "#d62728"),
+        ("DashBot", collect_paths(args.dashbot_log, args.dashbot_logs), "#1f77b4"),
+        ("DashBot-ind.", collect_paths(args.dashbot_ind_log, args.dashbot_ind_logs), "#ff7f0e"),
+        ("DashBot-pen.", collect_paths(args.dashbot_pen_log, args.dashbot_pen_logs), "#2ca02c"),
+        ("DQN", collect_paths(args.dqn_log, args.dqn_logs), "#d62728"),
     ]
     plt.figure(figsize=(7.5, 4.2))
     plotted = False
-    for label, path, color in series:
-        if not path or not path.exists():
+    for label, paths, color in series:
+        frames = read_training_logs(paths)
+        if not frames:
             continue
-        frame = pd.read_csv(path)
-        if frame.empty or "step" not in frame or "return" not in frame:
-            continue
-        frame = frame.sort_values("step")
-        smoothed = frame["return"].rolling(window=10, min_periods=1).mean()
-        deviation = frame["return"].rolling(window=10, min_periods=1).std().fillna(0.0)
-        plt.plot(frame["step"], smoothed, label=label, color=color, linewidth=1.5)
-        plt.fill_between(frame["step"], smoothed - deviation, smoothed + deviation, color=color, alpha=0.18)
+        summary = summarize_training_logs(frames)
+        plt.plot(summary["step"], summary["mean"], label=label, color=color, linewidth=1.5)
+        plt.fill_between(
+            summary["step"],
+            summary["mean"] - summary["std"],
+            summary["mean"] + summary["std"],
+            color=color,
+            alpha=0.18,
+        )
         plotted = True
 
     if not plotted:
@@ -65,6 +71,49 @@ def plot_learning_curve(args: argparse.Namespace) -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(args.output, dpi=220)
     print(f"saved={args.output}")
+
+
+def collect_paths(single_path: Path | None, extra_paths: list[Path] | None) -> list[Path]:
+    paths: list[Path] = []
+    if extra_paths:
+        paths.extend(extra_paths)
+    elif single_path:
+        paths.append(single_path)
+    return paths
+
+
+def read_training_logs(paths: list[Path]) -> list[pd.DataFrame]:
+    frames: list[pd.DataFrame] = []
+    for path in paths:
+        if not path or not path.exists():
+            continue
+        frame = pd.read_csv(path)
+        if frame.empty or "step" not in frame or "return" not in frame:
+            continue
+        frame = frame[["step", "return"]].dropna().sort_values("step")
+        if frame.empty:
+            continue
+        frame["return"] = frame["return"].rolling(window=10, min_periods=1).mean()
+        frames.append(frame)
+    return frames
+
+
+def summarize_training_logs(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    if len(frames) == 1:
+        frame = frames[0].copy()
+        frame["mean"] = frame["return"]
+        frame["std"] = frame["return"].rolling(window=10, min_periods=1).std().fillna(0.0)
+        return frame[["step", "mean", "std"]]
+
+    stacked = []
+    for run_id, frame in enumerate(frames):
+        copy = frame.copy()
+        copy["run_id"] = run_id
+        stacked.append(copy)
+    combined = pd.concat(stacked, ignore_index=True)
+    summary = combined.groupby("step")["return"].agg(["mean", "std"]).reset_index()
+    summary["std"] = summary["std"].fillna(0.0)
+    return summary
 
 
 def plot_user_study(args: argparse.Namespace) -> None:

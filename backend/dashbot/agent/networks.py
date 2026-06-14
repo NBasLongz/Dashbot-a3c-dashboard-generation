@@ -70,6 +70,51 @@ class DashBotActorCritic(nn.Module):
         return outputs
 
 
+class DashBotIndependentActorCritic(nn.Module):
+    """Ablation model for DashBot-ind.: shared Bi-LSTM with independent heads."""
+
+    def __init__(self, config: NetworkConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.encoder = nn.LSTM(
+            input_size=config.feature_size,
+            hidden_size=config.hidden_size,
+            batch_first=True,
+            bidirectional=True,
+        )
+        embedding_size = config.hidden_size * 2
+        self.fuse = nn.Sequential(
+            nn.Linear(embedding_size, embedding_size),
+            nn.ReLU(),
+        )
+        self.value_head = nn.Linear(embedding_size, 1)
+        self.heads = nn.ModuleDict(
+            {
+                "action": nn.Linear(embedding_size, 4),
+                "key_column": nn.Linear(embedding_size, config.max_columns),
+                "mark": nn.Linear(embedding_size, 4),
+                "x_field": nn.Linear(embedding_size, config.max_columns),
+                "y_field": nn.Linear(embedding_size, config.max_columns),
+                "color_field": nn.Linear(embedding_size, config.max_columns + 1),
+                "x_agg": nn.Linear(embedding_size, config.aggregate_count),
+                "y_agg": nn.Linear(embedding_size, config.aggregate_count),
+                "remove_index": nn.Linear(embedding_size, config.max_charts),
+            }
+        )
+
+    def forward(self, dashboard_features: torch.Tensor, masks: dict[str, torch.Tensor] | None = None) -> dict[str, torch.Tensor]:
+        encoded, _ = self.encoder(dashboard_features)
+        pooled = encoded.mean(dim=1)
+        shared = self.fuse(pooled)
+        outputs: dict[str, torch.Tensor] = {"value": self.value_head(shared).squeeze(-1)}
+        for name, head in self.heads.items():
+            logits = head(shared)
+            if masks and name in masks:
+                logits = logits.masked_fill(~masks[name].bool(), -1e9)
+            outputs[name] = logits
+        return outputs
+
+
 class SequentialHead(nn.Module):
     """One sequential classification block conditioned on previous context."""
 

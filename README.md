@@ -153,12 +153,14 @@ Done:
 - State feature encoder: `DashboardState -> torch.Tensor[max_charts, feature_size]`.
 - Policy sampler with constrained action/parameter sampling.
 - Actor-critic training loop in `scripts/train.py`.
+- Asynchronous A3C training loop in `scripts/train_a3c.py`.
+- Paper ablation baselines: `DashBot-ind.`, `DashBot-pen.`, and DQN training logs.
 - Demo checkpoint at `backend/dashbot/weights/dashbot_actor_critic.pth`.
 
 Next research step:
 
 - validate training quality on all 27 Vega datasets;
-- add true asynchronous A3C workers after the synchronous actor-critic loop is stable;
+- run multiple seeds for paper-style mean/std ablation curves;
 - tune constraints and reward constants based on generated dashboards.
 
 ## Train Agent
@@ -192,6 +194,44 @@ For the current demo checkpoint:
 ```bash
 python scripts/train.py --steps 200 --rollout-length 20 --save-path backend/dashbot/weights/dashbot_actor_critic.pth
 ```
+
+## Paper Ablation Study
+
+Use these commands to reproduce the Fig. 6-style learning curves. Each command writes a separate CSV log and checkpoint, so the models are not mixed.
+
+Full DashBot A3C:
+
+```bash
+python scripts/train_a3c.py --variant dashbot --steps 500000 --workers 4 --rollout-length 50 --learning-rate 1e-4 --entropy-coef 0.01 --hidden-size 128 --log-interval 5000 --log-csv reports/ablation/training_curve_dashbot.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dashbot --save-path backend/dashbot/weights/ablation/dashbot_actor_critic.pth
+```
+
+DashBot-ind. without sequential prediction blocks:
+
+```bash
+python scripts/train_a3c.py --variant dashbot-ind --steps 500000 --workers 4 --rollout-length 50 --learning-rate 1e-4 --entropy-coef 0.01 --hidden-size 128 --log-interval 5000 --log-csv reports/ablation/training_curve_dashbot_ind.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dashbot_ind --save-path backend/dashbot/weights/ablation/dashbot_ind_actor_critic.pth
+```
+
+DashBot-pen. without constrained sampling, using penalties for invalid choices:
+
+```bash
+python scripts/train_a3c.py --variant dashbot-pen --steps 500000 --workers 4 --rollout-length 50 --learning-rate 1e-4 --entropy-coef 0.01 --hidden-size 128 --invalid-penalty -1.0 --log-interval 5000 --log-csv reports/ablation/training_curve_dashbot_pen.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dashbot_pen --save-path backend/dashbot/weights/ablation/dashbot_pen_actor_critic.pth
+```
+
+DQN baseline:
+
+```bash
+python scripts/train_dqn.py --steps 500000 --learning-rate 1e-4 --hidden-size 128 --batch-size 64 --target-update-interval 5000 --log-interval 5000 --log-csv reports/ablation/training_curve_dqn.csv --checkpoint-interval 50000 --checkpoint-dir backend/dashbot/weights/ablation/checkpoints_dqn --save-path backend/dashbot/weights/ablation/dashbot_dqn.pth
+```
+
+Plot all four curves:
+
+```bash
+python scripts/plot_paper_figures.py learning-curve --dashbot-log reports/ablation/training_curve_dashbot.csv --dashbot-ind-log reports/ablation/training_curve_dashbot_ind.csv --dashbot-pen-log reports/ablation/training_curve_dashbot_pen.csv --dqn-log reports/ablation/training_curve_dqn.csv --output reports/fig6_ablation_learning_curve.png
+```
+
+For paper-style repeated runs, run each model with different `--seed` values and different log filenames, then pass all logs with `--dashbot-logs`, `--dashbot-ind-logs`, `--dashbot-pen-logs`, and `--dqn-logs`. The plot script will draw the mean line and standard-deviation band across runs.
+
+For a quick smoke test, replace `--steps 500000` with `--steps 100` and `--checkpoint-interval 0`.
 
 ## Demo Flow
 

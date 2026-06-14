@@ -285,3 +285,112 @@ class PolicySampler:
                 chart.x_agg = None
                 chart.y_agg = "mean" if y_type == "Q" else "count"
         return chart
+
+
+class PenaltyPolicySampler(PolicySampler):
+    """Sampler for DashBot-pen.: sample parameters without feasibility masks."""
+
+    def sample(
+        self,
+        outputs: dict[str, torch.Tensor],
+        state: DashboardState,
+        profile: DatasetProfile,
+    ) -> SampledDecision:
+        value = outputs["value"].squeeze(0)
+        log_probs: list[torch.Tensor] = []
+        entropies: list[torch.Tensor] = []
+
+        action = self._sample_unmasked_name(outputs["action"].squeeze(0), ACTION_TYPES, log_probs, entropies)
+        params: dict[str, Any] = {}
+        if action == "change":
+            params["key_column"] = self._sample_unmasked_column(
+                outputs["key_column"].squeeze(0),
+                profile,
+                log_probs,
+                entropies,
+            )
+        elif action == "add":
+            params["chart"] = self._sample_unmasked_chart(outputs, profile, log_probs, entropies)
+        elif action == "remove":
+            params["index"] = self._sample_unmasked_index(outputs["remove_index"].squeeze(0), log_probs, entropies)
+
+        return SampledDecision(
+            action=action,
+            params=params,
+            log_prob=torch.stack(log_probs).sum(),
+            entropy=torch.stack(entropies).sum(),
+            value=value,
+        )
+
+    def _sample_unmasked_chart(
+        self,
+        outputs: dict[str, torch.Tensor],
+        profile: DatasetProfile,
+        log_probs: list[torch.Tensor],
+        entropies: list[torch.Tensor],
+    ) -> ChartSpec:
+        mark = self._sample_unmasked_name(outputs["mark"].squeeze(0), MARK_TYPES, log_probs, entropies)
+        x_field = self._sample_unmasked_column(outputs["x_field"].squeeze(0), profile, log_probs, entropies)
+        y_field = self._sample_unmasked_column(outputs["y_field"].squeeze(0), profile, log_probs, entropies)
+        color_field = self._sample_unmasked_optional_column(outputs["color_field"].squeeze(0), profile, log_probs, entropies)
+        x_agg = self._sample_unmasked_name(outputs["x_agg"].squeeze(0), AGGREGATES, log_probs, entropies)
+        y_agg = self._sample_unmasked_name(outputs["y_agg"].squeeze(0), AGGREGATES, log_probs, entropies)
+        return ChartSpec(
+            mark=mark,
+            x=x_field,
+            y=y_field,
+            color=color_field,
+            x_agg=None if x_agg == "none" else x_agg,
+            y_agg=None if y_agg == "none" else y_agg,
+            title=f"{y_field} by {x_field}",
+        )
+
+    def _sample_unmasked_column(
+        self,
+        logits: torch.Tensor,
+        profile: DatasetProfile,
+        log_probs: list[torch.Tensor],
+        entropies: list[torch.Tensor],
+    ) -> str:
+        index = self._sample_unmasked_index(logits, log_probs, entropies)
+        columns = profile.modeled_columns()
+        if index < len(columns):
+            return columns[index].name
+        return f"__invalid_column_{index}"
+
+    def _sample_unmasked_optional_column(
+        self,
+        logits: torch.Tensor,
+        profile: DatasetProfile,
+        log_probs: list[torch.Tensor],
+        entropies: list[torch.Tensor],
+    ) -> str | None:
+        index = self._sample_unmasked_index(logits, log_probs, entropies)
+        columns = profile.modeled_columns()
+        if index < len(columns):
+            return columns[index].name
+        if index == len(columns):
+            return None
+        return f"__invalid_column_{index}"
+
+    @staticmethod
+    def _sample_unmasked_name(
+        logits: torch.Tensor,
+        vocabulary: tuple[Any, ...],
+        log_probs: list[torch.Tensor],
+        entropies: list[torch.Tensor],
+    ) -> Any:
+        index = PenaltyPolicySampler._sample_unmasked_index(logits[: len(vocabulary)], log_probs, entropies)
+        return vocabulary[index]
+
+    @staticmethod
+    def _sample_unmasked_index(
+        logits: torch.Tensor,
+        log_probs: list[torch.Tensor],
+        entropies: list[torch.Tensor],
+    ) -> int:
+        distribution = Categorical(logits=logits)
+        index = distribution.sample()
+        log_probs.append(distribution.log_prob(index))
+        entropies.append(distribution.entropy())
+        return int(index.item())
