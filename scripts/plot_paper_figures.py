@@ -24,16 +24,10 @@ def main() -> None:
     curve.add_argument("--dqn-logs", nargs="*", type=Path)
     curve.add_argument("--output", type=Path, default=ROOT / "reports" / "fig6_learning_curve.png")
 
-    study = subparsers.add_parser("user-study", help="Plot Fig. 8-style stacked user study votes.")
-    study.add_argument("--input", type=Path, help="CSV with columns: metric,dashbot,neutral,baseline")
-    study.add_argument("--output", type=Path, default=ROOT / "reports" / "fig8_user_study.png")
-    study.add_argument("--baseline-name", default="MultiVision")
-
     args = parser.parse_args()
     if args.command == "learning-curve":
         plot_learning_curve(args)
-    elif args.command == "user-study":
-        plot_user_study(args)
+
 
 
 def plot_learning_curve(args: argparse.Namespace) -> None:
@@ -116,47 +110,7 @@ def summarize_training_logs(frames: list[pd.DataFrame]) -> pd.DataFrame:
     return summary
 
 
-def plot_user_study(args: argparse.Namespace) -> None:
-    if args.input and args.input.exists():
-        frame = pd.read_csv(args.input)
-    else:
-        frame = pd.DataFrame(
-            [
-                {"metric": "Overall Quality", "dashbot": 39, "neutral": 3, "baseline": 8},
-                {"metric": "Understandability", "dashbot": 42, "neutral": 1, "baseline": 7},
-                {"metric": "Aesthetic", "dashbot": 38, "neutral": 3, "baseline": 9},
-                {"metric": "Insightfulness", "dashbot": 44, "neutral": 1, "baseline": 5},
-            ]
-        )
 
-    metrics = frame["metric"].tolist()
-    dashbot = frame["dashbot"].astype(float)
-    neutral = frame["neutral"].astype(float)
-    baseline = frame["baseline"].astype(float)
-    y_pos = range(len(metrics))
-
-    plt.figure(figsize=(7.5, 3.0))
-    plt.barh(y_pos, dashbot, color="#4C93C3", label="DashBot is more preferable")
-    plt.barh(y_pos, neutral, left=dashbot, color="#F28E2B", label="Neutral")
-    plt.barh(y_pos, baseline, left=dashbot + neutral, color="#59A14F", label=f"{args.baseline_name} is more preferable")
-
-    for index, (d_value, n_value, b_value) in enumerate(zip(dashbot, neutral, baseline)):
-        if d_value:
-            plt.text(d_value / 2, index, f"{int(d_value)}", va="center", ha="center", color="white", fontsize=8)
-        if n_value:
-            plt.text(d_value + n_value / 2, index, f"{int(n_value)}", va="center", ha="center", color="white", fontsize=8)
-        if b_value:
-            plt.text(d_value + n_value + b_value / 2, index, f"{int(b_value)}", va="center", ha="center", color="white", fontsize=8)
-
-    plt.yticks(list(y_pos), metrics)
-    plt.xlim(0, max((dashbot + neutral + baseline).max(), 1))
-    plt.xlabel("number of ratings")
-    plt.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.22), ncol=3, fontsize=8)
-    plt.gca().invert_yaxis()
-    plt.tight_layout()
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(args.output, dpi=220)
-    print(f"saved={args.output}")
 
 
 if __name__ == "__main__":
