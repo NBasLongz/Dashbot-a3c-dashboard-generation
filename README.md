@@ -1,21 +1,27 @@
 # DashBot: Insight-Driven Dashboard Generation
 
-Dự án tái hiện nghiên cứu **DashBot** dựa trên bài báo khoa học **"DashBot: Insight-Driven Dashboard Generation Based on Deep Reinforcement Learning"**.
-
-Dự án này tích hợp hai mục tiêu chính:
-1. **Nghiên cứu đối chứng (Ablation Study)**: Tái lập môi trường MDP (DashboardEnv), bộ tính toán phần thưởng (Reward Engine), cơ chế tạo mặt nạ ràng buộc (Constrained Sampling), thuật toán A3C và DQN để đo lường hiệu năng.
-2. **Hệ thống Demo Web (FastAPI & HTML/JS)**: Giao diện trực quan cho phép người dùng tải lên tệp CSV và hiển thị các biểu đồ gợi ý thời gian thực bằng mô hình DashBot đã huấn luyện.
+Dự án tái hiện nghiên cứu **DashBot** dựa trên bài báo khoa học **"DashBot: Insight-Driven Dashboard Generation Based on Deep Reinforcement Learning"** trong môn học Trí tuệ nhân tạo.
 
 ---
 
-## 1. Cấu trúc thư mục dự án
+## 👥 Thành viên thực hiện (Nhóm 4 - UIT)
+
+| MSSV | Họ và tên |
+| :--- | :--- |
+| **23520880** | Nguyễn Bá Long |
+| **20521170** | Nguyễn Quốc Đạt |
+| **23521355** | Nguyễn Nhật Sơn |
+
+---
+
+## 📂 1. Cấu trúc thư mục dự án
 
 ```text
 backend/dashbot/
   api/        - Các API FastAPI endpoint (health, profile, recommend)
   core/       - Xử lý dữ liệu (Profiler, Insight Detector, Chart Generator, Recommenders)
   rl_env/     - Môi trường RL (DashboardEnv, Reward Engine, Constraints)
-  agent/      - Mô hình mạng mạng học máy Bi-LSTM Actor-Critic và Policy Sampler
+  agent/      - Mô hình mạng học máy Bi-LSTM Actor-Critic và Policy Sampler
 frontend/
   index.html  - Giao diện web người dùng tải CSV và xem biểu đồ gợi ý
   css/        - Stylesheet giao diện
@@ -28,7 +34,7 @@ tests/        - Bộ unit test kiểm thử môi trường và logic cốt lõi
 
 ---
 
-## 2. Hướng dẫn cài đặt nhanh
+## 🛠️ 2. Hướng dẫn cài đặt nhanh
 
 ### Bước 1: Cài đặt thư viện phụ thuộc
 Cài đặt các thư viện cần thiết thông qua tệp `requirements.txt`:
@@ -54,7 +60,7 @@ pip install -r requirements.txt
 
 ---
 
-## 3. Khởi chạy hệ thống Demo
+## 🚀 3. Khởi chạy hệ thống Demo
 
 ### Bước 1: Chạy FastAPI Backend API
 Sau khi thiết lập `PYTHONPATH`, chạy lệnh sau để bật server backend:
@@ -68,7 +74,7 @@ python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
 
 ---
 
-## 4. Chạy kiểm thử & Vẽ lại đồ thị đối chứng (Ablation Study)
+## 📊 4. Chạy kiểm thử & Vẽ lại đồ thị đối chứng (Ablation Study)
 
 ### Chạy Unit Test
 Để xác nhận tính đúng đắn của môi trường và các hàm tính toán phần thưởng:
@@ -77,13 +83,13 @@ python -m pytest -q
 ```
 
 ### Đánh giá hiệu suất mô hình thực tế
-Bạn có thể đánh giá điểm chất lượng reward trung bình của mô hình trên các tập dữ liệu mẫu:
+Đánh giá điểm chất lượng reward trung bình của mô hình trên các tập dữ liệu mẫu:
 ```bash
 python scripts/evaluate.py data/processed/cars.csv
 ```
 
-### Vẽ lại biểu đồ so sánh 4 mô hình (Fig. 6)
-Để vẽ lại đường cong học tập học máy so sánh giữa 4 mô hình (`DashBot`, `DashBot-ind.`, `DashBot-pen.`, và `DQN`), chạy script sau:
+### Vẽ lại biểu đồ so sánh các mô hình (Fig. 6)
+Chạy script sau để vẽ đồ thị so sánh giữa 4 mô hình (`DashBot`, `DashBot-ind.`, `DashBot-pen.`, và `DQN`):
 ```bash
 python scripts/plot_paper_figures.py learning-curve --dashbot-log reports/ablation/training_curve_dashbot.csv --dashbot-ind-log reports/ablation/training_curve_dashbot_ind.csv --dashbot-pen-log reports/ablation/training_curve_dashbot_pen.csv --dqn-log reports/ablation/training_curve_dqn.csv --output reports/fig6_ablation_learning_curve.png
 ```
