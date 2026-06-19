@@ -4,7 +4,7 @@ Dự án tái hiện nghiên cứu **DashBot** dựa trên bài báo khoa học 
 
 ---
 
-## 👥 Thành viên thực hiện (Nhóm 4 - UIT)
+##  Thành viên thực hiện (Nhóm 4 - UIT)
 
 | MSSV | Họ và tên |
 | :--- | :--- |
@@ -14,7 +14,7 @@ Dự án tái hiện nghiên cứu **DashBot** dựa trên bài báo khoa học 
 
 ---
 
-## 📂 1. Cấu trúc thư mục dự án
+##  1. Cấu trúc thư mục dự án
 
 ```text
 backend/dashbot/
@@ -34,7 +34,7 @@ tests/        - Bộ unit test kiểm thử môi trường và logic cốt lõi
 
 ---
 
-## 🛠️ 2. Hướng dẫn cài đặt nhanh
+##  2. Hướng dẫn cài đặt nhanh
 
 ### Bước 1: Cài đặt thư viện phụ thuộc
 Cài đặt các thư viện cần thiết thông qua tệp `requirements.txt`:
@@ -60,7 +60,7 @@ pip install -r requirements.txt
 
 ---
 
-## 🚀 3. Khởi chạy hệ thống Demo
+##  3. Khởi chạy hệ thống Demo
 
 ### Bước 1: Chạy FastAPI Backend API
 Sau khi thiết lập `PYTHONPATH`, chạy lệnh sau để bật server backend:
@@ -74,7 +74,7 @@ python -m uvicorn dashbot.api.main:app --host 127.0.0.1 --port 8010
 
 ---
 
-## 📊 4. Chạy kiểm thử & Vẽ lại đồ thị đối chứng (Ablation Study)
+##  4. Chạy kiểm thử & Vẽ lại đồ thị đối chứng (Ablation Study)
 
 ### Chạy Unit Test
 Để xác nhận tính đúng đắn của môi trường và các hàm tính toán phần thưởng:
