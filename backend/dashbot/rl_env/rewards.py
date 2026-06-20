@@ -9,7 +9,7 @@ from dashbot.core.models import ChartSpec, DatasetProfile
 
 
 class RewardEngine:
-    """Presentation and insight rewards from the DashBot paper."""
+    """Tính toán phần thưởng trình bày và insight từ bài báo DashBot."""
 
     def __init__(
         self,

@@ -12,7 +12,7 @@ from dashbot.rl_env.rewards import RewardEngine
 
 
 class DashboardEnv:
-    """DashBot MDP environment: state, action execution, reward delta."""
+    """Môi trường MDP của DashBot: trạng thái, thực thi hành động, độ lệch phần thưởng."""
 
     def __init__(
         self,

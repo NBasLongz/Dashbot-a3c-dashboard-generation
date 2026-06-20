@@ -9,7 +9,7 @@ from dashbot.core.models import ChartSpec, DatasetProfile, Insight
 
 
 class InsightDetector:
-    """Detect the insight categories defined in the DashBot paper."""
+    """Phát hiện các danh mục insight được định nghĩa trong bài báo khoa học DashBot."""
 
     def __init__(self, correlation_threshold: float = 0.5, top_k: int = 5) -> None:
         self.correlation_threshold = correlation_threshold
@@ -86,7 +86,7 @@ class InsightDetector:
         return insights
 
     def _co_correlations(self, frame: pd.DataFrame, profile: DatasetProfile) -> list[Insight]:
-        """Dataset-level co-correlation helper kept for exploratory analysis."""
+        """Hàm bổ trợ tính toán đồng tương quan (co-correlation) ở cấp độ tập dữ liệu để phân tích khám phá."""
         quantitative = [column.name for column in profile.columns if column.type == "Q"]
         results: list[Insight] = []
         for a, b, c in itertools.combinations(quantitative, 3):

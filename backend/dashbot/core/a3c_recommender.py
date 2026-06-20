@@ -22,7 +22,7 @@ DEFAULT_WEIGHT_PATH = Path(__file__).resolve().parents[1] / "weights" / "dashbot
 
 
 class A3CDashboardRecommender:
-    """Realtime dashboard search driven by the DashBot actor-critic policy."""
+    """Tìm kiếm dashboard bằng A3C"""
 
     def __init__(
         self,
@@ -147,7 +147,7 @@ class A3CDashboardRecommender:
         variant = checkpoint.get("variant", "") if isinstance(checkpoint, dict) else ""
         self.variant = variant
         
-        # Check variant or file name to select policy sampler
+        # Kiểm tra biến thể hoặc tên tệp để chọn bộ lấy mẫu chính sách (policy sampler)
         if "dashbot_pen" in self.weight_path.name or variant == "dashbot-pen":
             self.policy = PenaltyPolicySampler()
             self.variant = "dashbot-pen"
@@ -171,15 +171,15 @@ class A3CDashboardRecommender:
     def _dashboard_reward(self, frame: pd.DataFrame, env: DashboardEnv, charts: list[ChartSpec]) -> float:
         raw_reward = self.reward_engine.dashboard_reward(frame, env.profile, charts)
         
-        # Apply penalty scale factor for ablation study baselines lacking constraints or sequence features
+        # Áp dụng hệ số phạt cho các mô hình baseline rút gọn (ablation study) thiếu ràng buộc hoặc thiếu đặc trưng tuần tự
         if "dashbot_pen" in self.weight_path.name or self.variant == "dashbot-pen":
-            # Penalty for unconstrained sampling baseline (missing feasibility masks)
+            # Phạt cho baseline lấy mẫu không ràng buộc (thiếu mặt nạ tính khả thi)
             return raw_reward * 0.20
         elif "dashbot_ind" in self.weight_path.name or self.variant == "dashbot-ind":
-            # Penalty for independent classification baseline (no sequential prediction dependency)
+            # Phạt cho baseline phân loại độc lập (không có sự phụ thuộc dự đoán tuần tự)
             return raw_reward * 0.68
         elif "dqn" in self.weight_path.name or self.variant == "dqn":
-            # Penalty for value-based DQN baseline comparison
+            # Phạt cho việc so sánh với baseline DQN dựa trên giá trị (value-based)
             return raw_reward * 0.38
             
         return raw_reward

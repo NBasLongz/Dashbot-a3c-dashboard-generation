@@ -18,7 +18,7 @@ class A3CConfig:
 
 
 class A3CTrainer:
-    """Minimal synchronous trainer shell; can be expanded to true async workers."""
+    """Khung huấn luyện đồng bộ tối giản; có thể mở rộng thành các worker bất đồng bộ thực sự."""
 
     def __init__(self, model: DashBotActorCritic, config: A3CConfig | None = None) -> None:
         self.model = model

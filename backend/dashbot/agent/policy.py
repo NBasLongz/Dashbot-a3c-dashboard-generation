@@ -24,7 +24,7 @@ class SampledDecision:
 
 
 class PolicySampler:
-    """Sample DashBot actions and parameters with constrained masks."""
+    """Lấy mẫu các hành động và tham số của DashBot sử dụng mặt nạ ràng buộc."""
 
     def __init__(self, constraints: ConstraintSampler | None = None) -> None:
         self.constraints = constraints or ConstraintSampler()
@@ -288,7 +288,7 @@ class PolicySampler:
 
 
 class PenaltyPolicySampler(PolicySampler):
-    """Sampler for DashBot-pen.: sample parameters without feasibility masks."""
+    """Bộ lấy mẫu cho DashBot-pen.: lấy mẫu tham số mà không có mặt nạ ràng buộc tính khả thi."""
 
     def sample(
         self,

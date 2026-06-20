@@ -10,7 +10,7 @@ from dashbot.core.models import ColumnProfile, ColumnType, DatasetProfile
 
 
 class DataProfiler:
-    """Build VizML-like handcrafted features for tabular columns."""
+    """Xây dựng các đặc trưng thủ công (handcrafted features) tương tự VizML cho các cột dữ liệu dạng bảng."""
 
     def __init__(self, max_modeled_columns: int = 10, temporal_parse_threshold: float = 0.8) -> None:
         self.max_modeled_columns = max_modeled_columns

@@ -19,7 +19,7 @@ class Transition:
 
 @dataclass
 class RolloutBuffer:
-    """Short-term trajectory memory for actor-critic updates."""
+    """Bộ nhớ lưu trữ quỹ đạo (trajectory) ngắn hạn phục vụ cho cập nhật actor-critic."""
 
     transitions: list[Transition] = field(default_factory=list)
 

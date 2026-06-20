@@ -13,7 +13,7 @@ from dashbot.rl_env.rewards import RewardEngine
 
 
 class GreedyDashboardRecommender:
-    """A constrained non-RL baseline useful before A3C training finishes."""
+    """Một baseline không sử dụng học tăng cường (non-RL) có ràng buộc, hữu ích trước khi hoàn tất huấn luyện A3C."""
 
     def __init__(
         self,

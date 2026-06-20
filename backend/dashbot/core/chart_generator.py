@@ -6,7 +6,7 @@ from dashbot.core.models import ChartSpec, DatasetProfile
 
 
 class ChartGenerator:
-    """Convert internal chart objects into Vega-Lite-compatible specs."""
+    """Chuyển đổi các đối tượng biểu đồ nội bộ thành đặc tả (specs) tương thích với Vega-Lite."""
 
     def to_vega_lite(
         self,

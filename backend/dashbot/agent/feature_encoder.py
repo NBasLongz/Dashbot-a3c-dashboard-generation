@@ -21,7 +21,7 @@ class FeatureEncoderConfig:
 
 
 class StateFeatureEncoder:
-    """Encode DashboardState as the chart-sequence tensor described in Section 5.2."""
+    """Mã hóa DashboardState thành tensor chuỗi biểu đồ như được mô tả trong Phần 5.2."""
 
     def __init__(self, config: FeatureEncoderConfig | None = None) -> None:
         self.config = config or FeatureEncoderConfig()
@@ -60,7 +60,8 @@ class StateFeatureEncoder:
 
     def encode_batch(self, states: list[DashboardState], profile: DatasetProfile) -> torch.Tensor:
         return torch.stack([self.encode(state, profile) for state in states], dim=0)
-
+    
+    #Mã hóa cột khóa và các cột hàng đầu theo mức độ ưu tiên
     def _context_features(self, state: DashboardState, profile: DatasetProfile) -> list[float]:
         by_name = profile.by_name()
         key_features = self._column_features(by_name.get(state.key_column or ""))
@@ -70,7 +71,7 @@ class StateFeatureEncoder:
         while len(column_features) < self.config.max_columns * self.column_feature_size:
             column_features.extend(self._zero_column())
         return key_features + column_features
-
+    # 
     def _chart_features(self, chart: ChartSpec, profile: DatasetProfile, frame: pd.DataFrame | None = None) -> list[float]:
         by_name = profile.by_name()
         mark = self._one_hot(chart.mark, MARK_TYPES)

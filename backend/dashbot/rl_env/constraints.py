@@ -24,7 +24,7 @@ class ConstraintMasks:
 
 
 class ConstraintSampler:
-    """Rule masks for constrained sampling before softmax."""
+    """Mặt nạ quy tắc cho việc lấy mẫu có ràng buộc trước khi áp dụng softmax."""
 
     action_space: tuple[ActionType, ...] = ("change", "add", "remove", "terminate")
     mark_space: tuple[MarkType, ...] = ("bar", "line", "point", "boxplot")

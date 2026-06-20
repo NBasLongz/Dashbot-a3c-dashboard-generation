@@ -16,7 +16,7 @@ class NetworkConfig:
 
 
 class DashBotActorCritic(nn.Module):
-    """Bi-LSTM actor-critic with sequential parameter heads from the paper."""
+    """Mạng Actor-Critic sử dụng cấu trúc Bi-LSTM với các đầu phân loại tuần tự"""
 
     def __init__(self, config: NetworkConfig) -> None:
         super().__init__()
@@ -32,8 +32,10 @@ class DashBotActorCritic(nn.Module):
             nn.Linear(embedding_size, embedding_size),
             nn.ReLU(),
         )
+        #nhánh Critic: dự đoán giá trị V(s)
         self.value_head = nn.Linear(embedding_size, 1)
 
+        #nhánh Actor: dự đoán xác suất cho từng thành phần
         self.action_block = SequentialHead(embedding_size, 4)
         self.key_column_block = SequentialHead(embedding_size, config.max_columns)
         self.mark_block = SequentialHead(embedding_size, 4)
@@ -71,7 +73,7 @@ class DashBotActorCritic(nn.Module):
 
 
 class DashBotIndependentActorCritic(nn.Module):
-    """Ablation model for DashBot-ind.: shared Bi-LSTM with independent heads."""
+    """Mô hình rút gọn (ablation model) cho DashBot-ind.: chia sẻ Bi-LSTM với các đầu phân loại độc lập."""
 
     def __init__(self, config: NetworkConfig) -> None:
         super().__init__()
@@ -116,7 +118,7 @@ class DashBotIndependentActorCritic(nn.Module):
 
 
 class SequentialHead(nn.Module):
-    """One sequential classification block conditioned on previous context."""
+    """Một khối phân loại tuần tự phụ thuộc vào ngữ cảnh phía trước."""
 
     def __init__(self, embedding_size: int, output_size: int) -> None:
         super().__init__()
